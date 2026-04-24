@@ -7,7 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService } from "../services";
+import { productosService, categoriasService } from "../services";
 import {
   Plus,
   Upload,
@@ -332,18 +332,68 @@ function ProductsSection() {
 }
 
 // ─── CATEGORIES SECTION ─────────────────────────────────────────────────
-function CategoriesSection() {
-  const store = useStore();
+// Wired to backend Categoria via categoriasService. The mock store-context
+// helpers (store.addCategory / store.categories) are intentionally no longer
+// used here — Categoria is a single backend-owned entity for this iteration.
+function CategoriesSection({
+  categorias,
+  loading,
+  error,
+  refresh,
+}: {
+  categorias: { id: number; nombre: string }[] | null;
+  loading: boolean;
+  error: { message: string } | null;
+  refresh: () => void;
+}) {
   const [tab, setTab] = useState("add");
   const [name, setName] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      store.addCategory(name.trim());
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await categoriasService.create({ nombre: trimmed });
       setName("");
+      refresh();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleSaveEdit = async (id: number) => {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await categoriasService.update(id, { nombre: editName.trim() });
+      setEditingId(null);
+      refresh();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await categoriasService.remove(id);
+      refresh();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
     }
   };
 
@@ -351,40 +401,49 @@ function CategoriesSection() {
     <>
       <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
 
+      {mutationError && (
+        <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
+      )}
+
       {tab === "add" && (
         <form onSubmit={handleAdd} className="flex gap-3">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la categoría" required className="flex-1" />
-          <Button type="submit" className="bg-primary hover:bg-primary/90"><Plus className="w-4 h-4 mr-1" /> Agregar</Button>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la categoría" required className="flex-1" disabled={mutating} />
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
+            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar"}
+          </Button>
         </form>
       )}
 
       {tab === "manage" && (
         <div className="space-y-2">
-          {store.categories.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-6 text-muted-foreground">Cargando categorías…</p>
+          ) : error ? (
+            <p className="text-center py-6 text-destructive">
+              No se pudieron cargar las categorías: {error.message}
+            </p>
+          ) : !categorias || categorias.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground">No hay categorías</p>
           ) : (
-            store.categories.map((c) => (
-              <div key={c.id} className={`flex items-center gap-3 p-3 rounded-lg border ${c.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"}`}>
+            categorias.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
                 <Tag className="w-4 h-4 text-primary flex-shrink-0" />
                 {editingId === c.id ? (
-                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 h-8" />
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 h-8" disabled={mutating} />
                 ) : (
-                  <span className={`flex-1 ${c.archived ? "line-through text-muted-foreground" : ""}`}>{c.name}</span>
+                  <span className="flex-1">{c.nombre}</span>
                 )}
-                {c.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
+                <Badge variant="outline" className="text-xs">#{c.id}</Badge>
                 <div className="flex items-center gap-1">
                   {editingId === c.id ? (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { store.updateCategory(c.id, editName); setEditingId(null); }}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)}><X className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSaveEdit(c.id)} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(c.id); setEditName(c.name); }}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.archiveCategory(c.id)}>
-                        {c.archived ? <ArchiveRestore className="w-3.5 h-3.5 text-accent" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.deleteCategory(c.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(c.id); setEditName(c.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(c.id)} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                     </>
                   )}
                 </div>
@@ -952,6 +1011,20 @@ export function AdminPanel() {
     ? `Error: ${backendProductosError.message}`
     : "Agregar y administrar videojuegos del catálogo";
 
+  // Live Categorias from the backend, shared with the CategoriesSection so a
+  // single source of truth drives both the card header and the manage list.
+  const {
+    data: backendCategorias,
+    loading: backendCategoriasLoading,
+    error: backendCategoriasError,
+    refresh: refreshCategorias,
+  } = useFetch(() => categoriasService.list(), []);
+  const categoriasSubtitle = backendCategoriasLoading
+    ? "Cargando categorías del backend…"
+    : backendCategoriasError
+    ? `Error: ${backendCategoriasError.message}`
+    : "Organiza los productos por género o tipo";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -998,10 +1071,17 @@ export function AdminPanel() {
           <AdminExpandableCard
             icon={<Tag className="w-5 h-5" />}
             title="Categorías"
-            subtitle="Organiza los productos por género o tipo"
+            subtitle={categoriasSubtitle}
             accentColor="bg-secondary/10 text-secondary"
+            count={backendCategorias?.length ?? null}
+            countLabel="en backend"
           >
-            <CategoriesSection />
+            <CategoriesSection
+              categorias={backendCategorias}
+              loading={backendCategoriasLoading}
+              error={backendCategoriasError}
+              refresh={refreshCategorias}
+            />
           </AdminExpandableCard>
 
           <AdminExpandableCard

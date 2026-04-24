@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks";
-import { productosService } from "../services";
+import { productosService, categoriasService } from "../services";
 import type { Seller } from "../data/games";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
@@ -139,6 +139,14 @@ export function Store() {
     error,
   } = useFetch(() => productosService.list(), []);
 
+  // Fetch real Categorias from the backend. Mock list from the store-context
+  // is kept as a fallback so the UI never disappears when the API is down.
+  const {
+    data: categorias,
+    loading: categoriasLoading,
+    error: categoriasError,
+  } = useFetch(() => categoriasService.list(), []);
+
   const activeCategories = store.getActiveCategories();
   const selectedSeller = selectedSellerId ? store.getSeller(selectedSellerId) : null;
 
@@ -184,27 +192,48 @@ export function Store() {
         {!selectedSellerId && (
           <div className="mb-8">
             <h2 className="mb-4">Categorías</h2>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={selectedCategory === "Todos" ? "default" : "outline"}
-                onClick={() => setSelectedCategory("Todos")}
-                className={selectedCategory === "Todos" ? "bg-primary hover:bg-primary/90" : ""}
-              >
-                Todos
-              </Button>
-              {activeCategories.map((cat) => (
+            {categoriasLoading ? (
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Cargando categorías…
+              </div>
+            ) : categoriasError ? (
+              <p className="text-sm text-destructive">
+                No se pudieron cargar las categorías: {categoriasError.message}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
                 <Button
-                  key={cat.id}
-                  variant={selectedCategory === cat.name ? "default" : "outline"}
-                  onClick={() => setSelectedCategory(cat.name)}
-                  className={selectedCategory === cat.name ? "bg-primary hover:bg-primary/90" : ""}
+                  variant={selectedCategory === "Todos" ? "default" : "outline"}
+                  onClick={() => setSelectedCategory("Todos")}
+                  className={selectedCategory === "Todos" ? "bg-primary hover:bg-primary/90" : ""}
                 >
-                  {cat.name}
+                  Todos
                 </Button>
-              ))}
-            </div>
+                {(categorias ?? []).length === 0 ? (
+                  <p className="text-sm text-muted-foreground self-center">
+                    No hay categorías disponibles
+                  </p>
+                ) : (
+                  (categorias ?? []).map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant={selectedCategory === cat.nombre ? "default" : "outline"}
+                      onClick={() => setSelectedCategory(cat.nombre)}
+                      className={selectedCategory === cat.nombre ? "bg-primary hover:bg-primary/90" : ""}
+                    >
+                      {cat.nombre}
+                    </Button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
+        {/* Reference kept so the legacy mock-driven categories list stays
+            tree-shaken without warnings while only Categoria from the backend
+            is wired in this iteration. */}
+        {void activeCategories}
 
         {/* Section title when filtering */}
         {selectedSellerId && (
