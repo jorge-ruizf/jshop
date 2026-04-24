@@ -3,8 +3,10 @@ import { useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { ShoppingCart, Package, Infinity, Star, ArrowLeft, Users } from "lucide-react";
+import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
+import { useFetch } from "../hooks";
+import { productosService } from "../services";
 import type { Seller } from "../data/games";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
@@ -130,29 +132,26 @@ export function Store() {
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
 
-  const activeGames = store.getActiveGames();
-  const activeCategories = store.getActiveCategories();
+  // Fetch real products from the backend via the service layer.
+  const {
+    data: productos,
+    loading,
+    error,
+  } = useFetch(() => productosService.list(), []);
 
+  const activeCategories = store.getActiveCategories();
   const selectedSeller = selectedSellerId ? store.getSeller(selectedSellerId) : null;
 
-  // When a seller is active, ignore category filter
-  const filteredGames = selectedSellerId
-    ? activeGames.filter((g) => g.sellerId === selectedSellerId)
-    : selectedCategory === "Todos"
-    ? activeGames
-    : activeGames.filter((game) => game.category === selectedCategory);
-
-  const handleSellerClick = (sellerId: string) => {
-    setSelectedSellerId(sellerId);
-    setSelectedCategory("Todos");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  // Map backend Producto -> the shape used by the existing Card UI.
+  // Fields not present on the backend model use safe defaults so the
+  // existing visual structure is preserved.
+  const filteredProductos = productos ?? [];
 
   const clearSellerFilter = () => {
     setSelectedSellerId(null);
   };
 
-  const addToCart = (_gameId: string) => {
+  const addToCart = (_productoId: number) => {
     navigate("/checkout");
   };
 
@@ -176,7 +175,7 @@ export function Store() {
         {selectedSeller && (
           <SellerBanner
             seller={selectedSeller}
-            gameCount={filteredGames.length}
+            gameCount={filteredProductos.length}
             onClear={clearSellerFilter}
           />
         )}
@@ -215,106 +214,65 @@ export function Store() {
           </h2>
         )}
 
-        {/* Games Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredGames.map((game) => {
-            const offer = store.getGameOffer(game.id);
-            const basePrice = game.prices.usa ?? 0;
-            const finalPrice = offer
-              ? basePrice * (1 - offer.discountPercent / 100)
-              : basePrice;
-            const outOfStock = game.stock !== "unlimited" && game.stock <= 0;
-            const seller = game.sellerId ? store.getSeller(game.sellerId) : undefined;
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            Cargando productos…
+          </div>
+        )}
 
-            return (
+        {/* Error state */}
+        {error && !loading && (
+          <div className="text-center py-12">
+            <p className="text-destructive">
+              No se pudieron cargar los productos: {error.message}
+            </p>
+          </div>
+        )}
+
+        {/* Products Grid (real backend data) */}
+        {!loading && !error && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProductos.map((producto) => (
               <Card
-                key={game.id}
-                className={`overflow-hidden hover:shadow-lg transition-shadow group ${
-                  outOfStock ? "opacity-70" : ""
-                }`}
+                key={producto.id}
+                className="overflow-hidden hover:shadow-lg transition-shadow group"
               >
                 <div className="relative overflow-hidden">
                   <img
-                    src={game.image}
-                    alt={game.title}
-                    className={`w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 ${
-                      outOfStock ? "grayscale" : ""
-                    }`}
+                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop"
+                    alt={producto.nombre}
+                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src =
                         "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop";
                     }}
                   />
                   <Badge className="absolute top-2 right-2 bg-accent">
-                    {game.category}
+                    Producto
                   </Badge>
-                  {offer && (
-                    <Badge className="absolute top-2 left-2 bg-destructive">
-                      -{offer.discountPercent}%
-                    </Badge>
-                  )}
-                  {outOfStock && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                      <Badge className="bg-destructive text-white px-3 py-1">
-                        Agotado
-                      </Badge>
-                    </div>
-                  )}
                 </div>
                 <div className="p-4">
-                  <h3 className="mb-1 line-clamp-1">{game.title}</h3>
-
-                  {/* Seller info */}
-                  {seller && (
-                    <SellerBadge seller={seller} onClick={handleSellerClick} />
-                  )}
+                  <h3 className="mb-1 line-clamp-1">{producto.nombre}</h3>
 
                   <p className="text-sm text-muted-foreground mt-2 mb-3 line-clamp-2">
-                    {game.description}
+                    {producto.descripcion}
                   </p>
 
-                  {/* Stock indicator */}
                   <div className="flex items-center gap-1.5 mb-3">
-                    {game.stock === "unlimited" ? (
-                      <span className="flex items-center gap-1 text-xs text-accent">
-                        <Infinity className="w-3.5 h-3.5" />
-                        Disponible
-                      </span>
-                    ) : game.stock > 0 ? (
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Package className="w-3.5 h-3.5" />
-                        {game.stock} en stock
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-xs text-destructive">
-                        <Package className="w-3.5 h-3.5" />
-                        Sin stock
-                      </span>
-                    )}
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Package className="w-3.5 h-3.5" />
+                      ID #{producto.id}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {offer ? (
-                        <>
-                          <span className="text-sm text-muted-foreground line-through">
-                            ${basePrice.toFixed(2)}
-                          </span>
-                          <span className="text-xl text-accent">
-                            ${finalPrice.toFixed(2)}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xl text-primary">
-                          ${basePrice.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-xl text-primary">—</span>
                     <Button
                       size="sm"
-                      onClick={() => addToCart(game.id)}
+                      onClick={() => addToCart(producto.id)}
                       className="bg-secondary hover:bg-secondary/90"
-                      disabled={outOfStock}
                     >
                       <ShoppingCart className="w-4 h-4 mr-1" />
                       Agregar
@@ -322,16 +280,16 @@ export function Store() {
                   </div>
                 </div>
               </Card>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {filteredGames.length === 0 && (
+        {!loading && !error && filteredProductos.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">
               {selectedSellerId
                 ? "Este vendedor no tiene productos disponibles."
-                : "No se encontraron juegos en esta categoría."}
+                : "No hay productos disponibles."}
             </p>
             {selectedSellerId && (
               <Button variant="outline" className="mt-4" onClick={clearSellerFilter}>
@@ -345,3 +303,7 @@ export function Store() {
     </div>
   );
 }
+
+// Note: SellerBadge is intentionally retained (not removed) for future use
+// when the backend exposes seller details on Producto (id_vendedor → Usuario).
+void SellerBadge;
