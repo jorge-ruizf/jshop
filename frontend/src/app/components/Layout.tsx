@@ -7,12 +7,18 @@ import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { useState } from "react";
 import { useStore } from "../data/store-context";
+import { useFetch } from "../hooks/useFetch";
+import { productosService } from "../services";
 
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const store = useStore();
-  const cartItemsCount = 0;
+  // Backend-driven count of available Productos (used as cart badge placeholder
+  // until the cart entity is wired). Loading/errors are handled silently here
+  // so they never block the chrome from rendering.
+  const { data: productos } = useFetch(() => productosService.list(), []);
+  const cartItemsCount = productos?.length ?? 0;
 
   const activeCountries = store.getActiveCountries();
 

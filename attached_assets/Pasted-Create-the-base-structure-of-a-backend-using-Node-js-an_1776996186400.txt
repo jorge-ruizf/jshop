@@ -1,0 +1,170 @@
+Create the base structure of a backend using Node.js and Express.
+
+Requirements:
+
+    Use a modular architecture:
+
+        /src
+            /controllers
+            /routes
+            /services
+            /middlewares
+
+    Setup Express server
+
+    Enable JSON parsing
+
+    Add a basic health route: GET /api/health
+
+    Prepare environment variables support using dotenv
+
+    Do not implement database yet
+
+Keep the code clean and minimal.
+43 minutes ago
+
+Add a PostgreSQL database using Prisma ORM.
+
+Requirements:
+
+    Initialize Prisma
+    Create schema.prisma
+    Configure connection using environment variables
+
+Create the following base models only (no relations yet):
+
+    Usuario (id, nombre, usuario, correo)
+    Producto (id, nombre, descripcion)
+    Categoria (id, nombre)
+    Pais (id, nombre)
+
+Run initial migration.
+
+Keep it simple and working.
+23 minutes ago
+
+Extend the Prisma schema with relationships.
+
+Add the following:
+
+    Usuario:
+        id_pais
+        id_rol
+        id_metodo_pago_fav
+
+    Producto:
+        id_vendedor (Usuario)
+        id_categoria
+        id_pais
+
+    Venta:
+        id_usuario
+        metodo_pago
+
+    Venta_x_Producto:
+        id_producto
+        id_venta
+        cantidad
+        precio
+
+    Carrito:
+        id_producto
+        id_usuario
+
+    Producto_Deseado:
+        id_producto
+        id_usuario
+
+    Precio:
+        id_producto
+        id_pais
+
+    Rol, Metodo_Pago, Videojuego
+
+Ensure all relations are properly defined in Prisma.
+
+Run migration after changes.
+20 minutes ago
+
+Create REST CRUD endpoints for the following entities:
+
+    Usuario
+    Producto
+    Categoria
+    Pais
+
+Requirements:
+
+    Controllers + routes
+    Basic validation
+    JSON responses
+    Use Prisma client
+
+Do not include advanced logic.
+17 minutes ago
+
+“use the existing code”
+“do not rewrite previous files”
+“only extend functionality”
+Add CRUD endpoints for:
+
+    Venta
+    Venta_x_Producto
+    Carrito
+
+Ensure relationships are handled correctly.
+
+Keep controllers modular.
+14 minutes ago
+
+"use the existing code”
+“do not rewrite previous files”
+“only extend functionality”
+Add CRUD endpoints for:
+
+Add CRUD endpoints for:
+
+    Chat
+    Mensaje
+    Imagen_Mensaje
+    Imagen_Producto
+    Valoracion
+    Notificacion
+
+Include relational queries where needed.
+11 minutes ago
+
+I already have a React frontend generated from Figma.
+
+Your task is to restructure and clean the project WITHOUT rewriting everything.
+
+Requirements:
+
+    Organize folders into:
+        /components
+        /pages
+        /services (for API calls)
+        /hooks (optional)
+
+    Identify reusable components (cards, tables, forms)
+
+    Do NOT change UI structure
+
+    Do NOT remove existing components
+
+    Only refactor for scalability
+
+Ensure the app still runs after refactoring.
+8 minutes ago
+
+Connect Store.txt with Product to the backend API.
+
+Requirements:
+
+    Replace mock data with real API calls
+    Use the service layer
+    Display data in existing components
+    Handle loading and errors
+
+Do NOT modify other pages.
+Only implement for ONE entity.

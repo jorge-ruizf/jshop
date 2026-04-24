@@ -6,33 +6,50 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Separator } from "../components/ui/separator";
-import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Star } from "lucide-react";
+import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Star, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
+import { useFetch } from "../hooks/useFetch";
+import { productosService } from "../services";
+import type { Producto } from "../services/types";
+import { useEffect } from "react";
 
-// Mock cart items
-const mockCartItems = [
-  {
-    id: "1",
-    title: "Cyber Warriors 2077",
-    price: 59.99,
-    image:
-      "https://images.unsplash.com/flagged/photo-1572383761657-4919d351d433?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjeWJlcnB1bmslMjBmdXR1cmlzdGljJTIwZ2FtZSUyMGNvdmVyfGVufDF8fHx8MTc3MTI5NTQzOHww&ixlib=rb-4.1.0&q=80&w=1080",
-    quantity: 1,
-  },
-  {
-    id: "2",
-    title: "Fantasy Realms",
+// Shape used by the existing rendering code below. Kept identical so the
+// JSX (image, title, price, quantity) does not need to change.
+type CartItem = {
+  id: string;
+  title: string;
+  price: number;
+  image: string;
+  quantity: number;
+};
+
+// Map a backend Producto into the cart shape the UI expects. Price/image are
+// not part of the Producto model yet, so we use deterministic placeholders
+// derived from the id until those entities (Precio, Imagen_Producto) are wired.
+function productoToCartItem(p: Producto): CartItem {
+  return {
+    id: String(p.id),
+    title: p.nombre,
     price: 49.99,
     image:
-      "https://images.unsplash.com/photo-1562576650-27130b06c0ab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmYW50YXN5JTIwbWVkaWV2YWwlMjBnYW1lJTIwY292ZXJ8ZW58MXx8fHwxNzcxMjk1NDM5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop",
     quantity: 1,
-  },
-];
+  };
+}
 
 export function Checkout() {
   const navigate = useNavigate();
   const store = useStore();
-  const [cartItems, setCartItems] = useState(mockCartItems);
+  const {
+    data: productos,
+    loading: productosLoading,
+    error: productosError,
+  } = useFetch(() => productosService.list(), []);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  // Sync cart items with backend Productos once they arrive.
+  useEffect(() => {
+    if (productos) setCartItems(productos.map(productoToCartItem));
+  }, [productos]);
   const [onHoldItems, setOnHoldItems] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("paypal");
   const [paymentCountry, setPaymentCountry] = useState("internacional");
@@ -128,7 +145,16 @@ export function Checkout() {
             <Card className="p-6">
               <h2 className="mb-4">Productos en el Carrito</h2>
               <div className="space-y-4">
-                {cartItems.length === 0 ? (
+                {productosLoading ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Cargando productos…
+                  </div>
+                ) : productosError ? (
+                  <p className="text-center py-8 text-destructive">
+                    No se pudieron cargar los productos: {productosError.message}
+                  </p>
+                ) : cartItems.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">
                     Tu carrito está vacío
                   </p>

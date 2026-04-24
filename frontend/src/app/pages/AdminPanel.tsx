@@ -6,6 +6,8 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
 import { useStore } from "../data/store-context";
+import { useFetch } from "../hooks/useFetch";
+import { productosService } from "../services";
 import {
   Plus,
   Upload,
@@ -941,6 +943,15 @@ function SellersSection() {
 
 // ─── MAIN ADMIN PANEL ───────────────────────────────────────────────────
 export function AdminPanel() {
+  // Live Producto count from backend, surfaced in the Productos card header.
+  const { data: backendProductos, loading: backendProductosLoading, error: backendProductosError } =
+    useFetch(() => productosService.list(), []);
+  const productosSubtitle = backendProductosLoading
+    ? "Cargando productos del backend…"
+    : backendProductosError
+    ? `Error: ${backendProductosError.message}`
+    : "Agregar y administrar videojuegos del catálogo";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -957,9 +968,11 @@ export function AdminPanel() {
           <AdminExpandableCard
             icon={<Gamepad2 className="w-5 h-5" />}
             title="Productos"
-            subtitle="Agregar y administrar videojuegos del catálogo"
+            subtitle={productosSubtitle}
             defaultOpen={true}
             accentColor="bg-primary/10 text-primary"
+            count={backendProductos?.length ?? null}
+            countLabel="en backend"
           >
             <ProductsSection />
           </AdminExpandableCard>

@@ -8,6 +8,8 @@ interface AdminExpandableCardProps {
   children: ReactNode;
   defaultOpen?: boolean;
   accentColor?: string;
+  count?: number | null;
+  countLabel?: string;
 }
 
 export function AdminExpandableCard({
@@ -17,6 +19,8 @@ export function AdminExpandableCard({
   children,
   defaultOpen = false,
   accentColor = "bg-primary/10 text-primary",
+  count,
+  countLabel,
 }: AdminExpandableCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen);
 
@@ -34,7 +38,16 @@ export function AdminExpandableCard({
           </div>
           <div className="text-left">
             <h3 className="text-[1rem]">{title}</h3>
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-sm text-muted-foreground">
+              {subtitle}
+              {typeof count === "number" && (
+                <>
+                  {" · "}
+                  <span className="text-foreground">{count}</span>
+                  {countLabel ? ` ${countLabel}` : ""}
+                </>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors">

@@ -6,11 +6,18 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { Mail, Lock } from "lucide-react";
+import { useFetch } from "../hooks/useFetch";
+import { productosService } from "../services";
 
 export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Pull live Producto catalog count from the backend as a small marketing
+  // hint under the header. Errors are intentionally suppressed — auth UI
+  // must always render even if the catalog endpoint is down.
+  const { data: productos, loading: productosLoading, error: productosError } =
+    useFetch(() => productosService.list(), []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +38,14 @@ export function Login() {
           <h1 className="mb-2">Iniciar Sesión</h1>
           <p className="text-muted-foreground">
             Accede a tu cuenta de GameStore Pro
+          </p>
+          {/* Live Producto count from backend */}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {productosLoading
+              ? "Cargando catálogo…"
+              : productosError
+              ? `Catálogo no disponible: ${productosError.message}`
+              : `${productos?.length ?? 0} productos disponibles ahora mismo`}
           </p>
         </div>
 
