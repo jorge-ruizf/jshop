@@ -20,10 +20,15 @@ model Usuario {
   rol              Rol         @relation(fields: [id_rol], references: [id])
   metodo_pago_fav  Metodo_Pago @relation(fields: [id_metodo_pago_fav], references: [id])
 
-  productos        Producto[]         @relation("ProductoVendedor")
-  ventas           Venta[]
-  carrito          Carrito[]
+  productos          Producto[]         @relation("ProductoVendedor")
+  ventas             Venta[]
+  carrito            Carrito[]
   productos_deseados Producto_Deseado[]
+  chats_a            Chat[]             @relation("ChatUsuarioA")
+  chats_b            Chat[]             @relation("ChatUsuarioB")
+  mensajes           Mensaje[]
+  valoraciones       Valoracion[]
+  notificaciones     Notificacion[]
 }
 
 model Producto {
@@ -42,6 +47,8 @@ model Producto {
   carrito           Carrito[]
   deseados          Producto_Deseado[]
   precios           Precio[]
+  imagenes          Imagen_Producto[]
+  valoraciones      Valoracion[]
 }
 
 model Categoria {
@@ -128,4 +135,65 @@ model Precio {
 model Videojuego {
   id     Int    @id @default(autoincrement())
   nombre String
+}
+
+model Chat {
+  id            Int      @id @default(autoincrement())
+  id_usuario_a  Int
+  id_usuario_b  Int
+  creado_en     DateTime @default(now())
+
+  usuario_a Usuario   @relation("ChatUsuarioA", fields: [id_usuario_a], references: [id])
+  usuario_b Usuario   @relation("ChatUsuarioB", fields: [id_usuario_b], references: [id])
+  mensajes  Mensaje[]
+}
+
+model Mensaje {
+  id         Int      @id @default(autoincrement())
+  id_chat    Int
+  id_usuario Int
+  contenido  String
+  enviado_en DateTime @default(now())
+
+  chat     Chat              @relation(fields: [id_chat], references: [id])
+  usuario  Usuario           @relation(fields: [id_usuario], references: [id])
+  imagenes Imagen_Mensaje[]
+}
+
+model Imagen_Mensaje {
+  id         Int    @id @default(autoincrement())
+  id_mensaje Int
+  url        String
+
+  mensaje Mensaje @relation(fields: [id_mensaje], references: [id])
+}
+
+model Imagen_Producto {
+  id          Int    @id @default(autoincrement())
+  id_producto Int
+  url         String
+
+  producto Producto @relation(fields: [id_producto], references: [id])
+}
+
+model Valoracion {
+  id          Int      @id @default(autoincrement())
+  id_usuario  Int
+  id_producto Int
+  puntuacion  Int
+  comentario  String?
+  creado_en   DateTime @default(now())
+
+  usuario  Usuario  @relation(fields: [id_usuario], references: [id])
+  producto Producto @relation(fields: [id_producto], references: [id])
+}
+
+model Notificacion {
+  id         Int      @id @default(autoincrement())
+  id_usuario Int
+  contenido  String
+  leida      Boolean  @default(false)
+  creado_en  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [id_usuario], references: [id])
 }
