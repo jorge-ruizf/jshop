@@ -9,7 +9,7 @@ import { Separator } from "../components/ui/separator";
 import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Star, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService } from "../services";
+import { productosService, paisesService, metodosPagoService } from "../services";
 import type { Producto } from "../services/types";
 import { useEffect } from "react";
 
@@ -51,32 +51,45 @@ export function Checkout() {
     if (productos) setCartItems(productos.map(productoToCartItem));
   }, [productos]);
   const [onHoldItems, setOnHoldItems] = useState<string[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState("paypal");
-  const [paymentCountry, setPaymentCountry] = useState("internacional");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentCountry, setPaymentCountry] = useState("");
 
-  const activeCountries = store.getActiveCountries();
+  // Backend-driven Pais list for the country selector. Backend Pais only has
+  // { id, nombre } so flag/currency are not displayed. The "internacional"
+  // option is gone — there is no equivalent in the schema yet.
+  const {
+    data: backendPaises,
+    loading: paisesLoading,
+    error: paisesError,
+  } = useFetch(() => paisesService.list(), []);
 
-  // Build country options including "internacional"
-  const countryOptions = [
-    ...activeCountries.map((c) => ({
-      code: c.code,
-      label: `${c.flag} ${c.name}`,
-    })),
-    { code: "internacional", label: "\u{1F30E} Internacional" },
-  ];
+  // Backend-driven MetodoPago list. The backend has no per-country relation
+  // yet, so the same list is shown regardless of the selected paymentCountry.
+  const {
+    data: backendMetodos,
+    loading: metodosLoading,
+    error: metodosError,
+  } = useFetch(() => metodosPagoService.list(), []);
 
-  const countryNames: Record<string, string> = {};
-  activeCountries.forEach((c) => (countryNames[c.code] = c.name));
-  countryNames["internacional"] = "Internacional";
+  // Default the paymentCountry to the first available backend country.
+  useEffect(() => {
+    if (!paymentCountry && backendPaises && backendPaises.length > 0) {
+      setPaymentCountry(String(backendPaises[0].id));
+    }
+  }, [backendPaises, paymentCountry]);
 
-  const currentPaymentMethods = store.getActivePaymentMethods(paymentCountry);
+  // Default the paymentMethod to the first available backend method.
+  useEffect(() => {
+    if (!paymentMethod && backendMetodos && backendMetodos.length > 0) {
+      setPaymentMethod(String(backendMetodos[0].id));
+    }
+  }, [backendMetodos, paymentMethod]);
+
+  const selectedCountryName =
+    backendPaises?.find((c) => String(c.id) === paymentCountry)?.nombre ?? "";
 
   const handleCountryChange = (country: string) => {
     setPaymentCountry(country);
-    const methods = store.getActivePaymentMethods(country);
-    if (methods.length > 0) {
-      setPaymentMethod(methods[0].value);
-    }
   };
 
   const toggleOnHold = (id: string) => {
@@ -362,11 +375,19 @@ export function Checkout() {
                     id="paymentCountry"
                     value={paymentCountry}
                     onChange={(e) => handleCountryChange(e.target.value)}
+                    disabled={paisesLoading || !!paisesError}
                     className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {countryOptions.map((opt) => (
-                      <option key={opt.code} value={opt.code}>
-                        {opt.label}
+                    {paisesLoading && <option value="">Cargando países…</option>}
+                    {paisesError && (
+                      <option value="">Error: {paisesError.message}</option>
+                    )}
+                    {!paisesLoading && !paisesError && (!backendPaises || backendPaises.length === 0) && (
+                      <option value="">Sin países configurados</option>
+                    )}
+                    {!paisesLoading && !paisesError && backendPaises?.map((opt) => (
+                      <option key={opt.id} value={String(opt.id)}>
+                        {opt.nombre}
                       </option>
                     ))}
                   </select>
@@ -375,12 +396,20 @@ export function Checkout() {
                 <Separator className="mb-4" />
 
                 <h3 className="text-sm text-muted-foreground mb-4">
-                  {countryNames[paymentCountry] || paymentCountry}
+                  {selectedCountryName || "Selecciona un país"}
                 </h3>
 
-                {currentPaymentMethods.length === 0 ? (
+                {metodosLoading ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay métodos de pago configurados para este país
+                    Cargando métodos de pago…
+                  </p>
+                ) : metodosError ? (
+                  <p className="text-sm text-destructive text-center py-4">
+                    No se pudieron cargar los métodos: {metodosError.message}
+                  </p>
+                ) : !backendMetodos || backendMetodos.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No hay métodos de pago configurados
                   </p>
                 ) : (
                   <RadioGroup
@@ -388,21 +417,18 @@ export function Checkout() {
                     onValueChange={setPaymentMethod}
                   >
                     <div className="space-y-3">
-                      {currentPaymentMethods.map((method) => (
+                      {backendMetodos.map((method) => (
                         <label
                           key={method.id}
                           className="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors"
                         >
                           <RadioGroupItem
-                            value={method.value}
-                            id={method.value}
+                            value={String(method.id)}
+                            id={`metodo-${method.id}`}
                           />
                           <Wallet className="w-5 h-5 text-primary" />
                           <div className="flex-1">
-                            <p>{method.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {method.description}
-                            </p>
+                            <p>{method.nombre}</p>
                           </div>
                         </label>
                       ))}

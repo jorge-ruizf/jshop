@@ -6,3 +6,4 @@ export { usuariosService } from "./usuarios.service";
 export { productosService } from "./productos.service";
 export { categoriasService } from "./categorias.service";
 export { paisesService } from "./paises.service";
+export { metodosPagoService } from "./metodosPago.service";

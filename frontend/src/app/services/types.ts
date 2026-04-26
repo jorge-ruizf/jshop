@@ -30,6 +30,11 @@ export interface Pais {
   nombre: string;
 }
 
+export interface MetodoPago {
+  id: number;
+  nombre: string;
+}
+
 export interface Venta {
   id: number;
   id_usuario: number;

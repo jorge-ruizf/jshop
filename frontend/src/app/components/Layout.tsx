@@ -8,7 +8,7 @@ import { Separator } from "./ui/separator";
 import { useState } from "react";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService } from "../services";
+import { productosService, paisesService } from "../services";
 
 export function Layout() {
   const location = useLocation();
@@ -20,12 +20,19 @@ export function Layout() {
   const { data: productos } = useFetch(() => productosService.list(), []);
   const cartItemsCount = productos?.length ?? 0;
 
-  const activeCountries = store.getActiveCountries();
+  // Backend-driven country list for the user-profile preferred-country
+  // dropdown. Replaces the mock `store.getActiveCountries()`. Backend Pais
+  // only stores { id, nombre }, so flag/currency are not displayed here.
+  const {
+    data: backendPaises,
+    loading: paisesLoading,
+    error: paisesError,
+  } = useFetch(() => paisesService.list(), []);
 
   const [userProfile, setUserProfile] = useState({
     name: "Usuario Gamer",
     discord: "gamer#1234",
-    preferredCountry: "usa",
+    preferredCountry: "",
   });
 
   const [editMode, setEditMode] = useState({
@@ -162,11 +169,17 @@ export function Layout() {
                         id="country"
                         value={userProfile.preferredCountry}
                         onChange={(e) => setUserProfile({ ...userProfile, preferredCountry: e.target.value })}
+                        disabled={paisesLoading || !!paisesError}
                         className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        {activeCountries.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.flag} {country.name} ({country.currency})
+                        {paisesLoading && <option value="">Cargando países…</option>}
+                        {paisesError && <option value="">Error: {paisesError.message}</option>}
+                        {!paisesLoading && !paisesError && (!backendPaises || backendPaises.length === 0) && (
+                          <option value="">Sin países configurados</option>
+                        )}
+                        {!paisesLoading && !paisesError && backendPaises?.map((country) => (
+                          <option key={country.id} value={String(country.id)}>
+                            {country.nombre}
                           </option>
                         ))}
                       </select>

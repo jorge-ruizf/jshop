@@ -7,7 +7,8 @@ import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService, categoriasService } from "../services";
+import { productosService, categoriasService, paisesService, metodosPagoService } from "../services";
+import type { Pais, MetodoPago } from "../services/types";
 import {
   Plus,
   Upload,
@@ -457,86 +458,102 @@ function CategoriesSection({
 }
 
 // ─── COUNTRIES SECTION ──────────────────────────────────────────────────
-function CountriesSection() {
-  const store = useStore();
+// Wired to backend Pais via paisesService. The backend Pais model only
+// stores { id, nombre } — code/flag/currency aren't persisted yet, so this
+// section now manages just the country name. The mock store-context country
+// helpers are intentionally unused here.
+function CountriesSection({
+  paises,
+  loading,
+  error,
+  refresh,
+}: {
+  paises: Pais[] | null;
+  loading: boolean;
+  error: { message: string } | null;
+  refresh: () => void;
+}) {
   const [tab, setTab] = useState("add");
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [flag, setFlag] = useState("");
-  const [currency, setCurrency] = useState("");
-  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [editCurrency, setEditCurrency] = useState("");
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const runMutation = async (op: () => Promise<unknown>, after?: () => void) => {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await op();
+      after?.();
+      refresh();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
+    }
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code && name && currency) {
-      store.addCountry({ code: code.toLowerCase().trim(), name: name.trim(), flag: flag.trim() || "🏳️", currency: currency.toUpperCase().trim() });
-      setCode(""); setName(""); setFlag(""); setCurrency("");
-    }
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    runMutation(() => paisesService.create({ nombre: trimmed }), () => setName(""));
   };
 
   return (
     <>
       <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
 
+      {mutationError && (
+        <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
+      )}
+
       {tab === "add" && (
         <form onSubmit={handleAdd} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-sm">Código *</Label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="ej: bolivia" required />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Nombre *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bolivia" required />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Bandera (emoji)</Label>
-              <Input value={flag} onChange={(e) => setFlag(e.target.value)} placeholder="🇧🇴" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Moneda *</Label>
-              <Input value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="BOB" required />
-            </div>
+          <div className="space-y-1">
+            <Label className="text-sm">Nombre *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bolivia" required disabled={mutating} />
+            <p className="text-xs text-muted-foreground">El backend solo persiste el nombre.</p>
           </div>
-          <Button type="submit" className="bg-primary hover:bg-primary/90"><Plus className="w-4 h-4 mr-1" /> Agregar País</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
+            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar País"}
+          </Button>
         </form>
       )}
 
       {tab === "manage" && (
         <div className="space-y-2">
-          {store.countries.length === 0 ? (
+          {loading ? (
+            <p className="text-center py-6 text-muted-foreground">Cargando países…</p>
+          ) : error ? (
+            <p className="text-center py-6 text-destructive">
+              No se pudieron cargar los países: {error.message}
+            </p>
+          ) : !paises || paises.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground">No hay países configurados</p>
           ) : (
-            store.countries.map((c) => (
-              <div key={c.code} className={`flex items-center gap-3 p-3 rounded-lg border ${c.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"}`}>
-                <span className="text-xl flex-shrink-0">{c.flag}</span>
-                {editingCode === c.code ? (
-                  <div className="flex-1 flex gap-2">
-                    <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" placeholder="Nombre" />
-                    <Input value={editCurrency} onChange={(e) => setEditCurrency(e.target.value)} className="h-8 w-24" placeholder="Moneda" />
-                  </div>
+            paises.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
+                <span className="text-xl flex-shrink-0">🏳️</span>
+                {editingId === c.id ? (
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" placeholder="Nombre" disabled={mutating} />
                 ) : (
                   <div className="flex-1">
-                    <span className={c.archived ? "line-through text-muted-foreground" : ""}>{c.name}</span>
-                    <span className="text-sm text-muted-foreground ml-2">({c.currency})</span>
+                    <span>{c.nombre}</span>
                   </div>
                 )}
-                {c.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
+                <Badge variant="outline" className="text-xs">#{c.id}</Badge>
                 <div className="flex items-center gap-1">
-                  {editingCode === c.code ? (
+                  {editingId === c.id ? (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { store.updateCountry(c.code, { name: editName, currency: editCurrency }); setEditingCode(null); }}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingCode(null)}><X className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => paisesService.update(c.id, { nombre: editName.trim() }), () => setEditingId(null))} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingCode(c.code); setEditName(c.name); setEditCurrency(c.currency); }}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.archiveCountry(c.code)}>
-                        {c.archived ? <ArchiveRestore className="w-3.5 h-3.5 text-accent" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.deleteCountry(c.code)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(c.id); setEditName(c.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => paisesService.remove(c.id))} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                     </>
                   )}
                 </div>
@@ -550,115 +567,101 @@ function CountriesSection() {
 }
 
 // ─── PAYMENT METHODS SECTION ────────────────────────────────────────────
-function PaymentMethodsSection() {
-  const store = useStore();
+// Wired to backend Metodo_Pago via metodosPagoService. The backend model
+// stores only { id, nombre } — value/description/countryCode aren't
+// persisted, so the per-country grouping from the mock store is dropped here.
+function PaymentMethodsSection({
+  metodos,
+  loading,
+  error,
+  refresh,
+}: {
+  metodos: MetodoPago[] | null;
+  loading: boolean;
+  error: { message: string } | null;
+  refresh: () => void;
+}) {
   const [tab, setTab] = useState("add");
-  const [value, setValue] = useState("");
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [countryCode, setCountryCode] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [editDesc, setEditDesc] = useState("");
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const allCountryCodes = [...store.countries.map((c) => c.code), "internacional"];
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (value && name && countryCode) {
-      store.addPaymentMethod({ value: value.trim(), name: name.trim(), description: description.trim(), countryCode });
-      setValue(""); setName(""); setDescription(""); setCountryCode("");
+  const runMutation = async (op: () => Promise<unknown>, after?: () => void) => {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await op();
+      after?.();
+      refresh();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMutating(false);
     }
   };
 
-  // Group methods by country
-  const grouped: Record<string, typeof store.paymentMethods> = {};
-  store.paymentMethods.forEach((m) => {
-    if (!grouped[m.countryCode]) grouped[m.countryCode] = [];
-    grouped[m.countryCode].push(m);
-  });
-
-  const getCountryLabel = (cc: string) => {
-    if (cc === "internacional") return "🌎 Internacional";
-    const c = store.countries.find((x) => x.code === cc);
-    return c ? `${c.flag} ${c.name}` : cc;
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    runMutation(() => metodosPagoService.create({ nombre: trimmed }), () => setName(""));
   };
 
   return (
     <>
       <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
 
+      {mutationError && (
+        <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
+      )}
+
       {tab === "add" && (
         <form onSubmit={handleAdd} className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-sm">Identificador *</Label>
-              <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder="ej: nequi" required />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm">Nombre visible *</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nequi" required />
-            </div>
-          </div>
           <div className="space-y-1">
-            <Label className="text-sm">Descripción</Label>
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Transferencia rápida con Nequi" />
+            <Label className="text-sm">Nombre *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej: Nequi" required disabled={mutating} />
+            <p className="text-xs text-muted-foreground">El backend solo persiste el nombre.</p>
           </div>
-          <div className="space-y-1">
-            <Label className="text-sm">País asociado *</Label>
-            <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)} required className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">Selecciona país</option>
-              {allCountryCodes.map((cc) => (
-                <option key={cc} value={cc}>{getCountryLabel(cc)}</option>
-              ))}
-            </select>
-          </div>
-          <Button type="submit" className="bg-primary hover:bg-primary/90"><Plus className="w-4 h-4 mr-1" /> Agregar Método</Button>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
+            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar Método"}
+          </Button>
         </form>
       )}
 
       {tab === "manage" && (
-        <div className="space-y-4">
-          {Object.keys(grouped).length === 0 ? (
+        <div className="space-y-2">
+          {loading ? (
+            <p className="text-center py-6 text-muted-foreground">Cargando métodos de pago…</p>
+          ) : error ? (
+            <p className="text-center py-6 text-destructive">
+              No se pudieron cargar los métodos: {error.message}
+            </p>
+          ) : !metodos || metodos.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground">No hay métodos de pago</p>
           ) : (
-            Object.entries(grouped).map(([cc, methods]) => (
-              <div key={cc}>
-                <p className="text-sm text-muted-foreground mb-2">{getCountryLabel(cc)}</p>
-                <div className="space-y-2">
-                  {methods.map((m) => (
-                    <div key={m.id} className={`flex items-center gap-3 p-3 rounded-lg border ${m.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"}`}>
-                      <Wallet className="w-4 h-4 text-primary flex-shrink-0" />
-                      {editingId === m.id ? (
-                        <div className="flex-1 flex gap-2">
-                          <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" />
-                          <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-8 flex-1" />
-                        </div>
-                      ) : (
-                        <div className="flex-1 min-w-0">
-                          <p className={`truncate ${m.archived ? "line-through text-muted-foreground" : ""}`}>{m.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{m.description}</p>
-                        </div>
-                      )}
-                      {m.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {editingId === m.id ? (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { store.updatePaymentMethod(m.id, { name: editName, description: editDesc }); setEditingId(null); }}><Check className="w-4 h-4 text-accent" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)}><X className="w-4 h-4" /></Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(m.id); setEditName(m.name); setEditDesc(m.description); }}><Pencil className="w-3.5 h-3.5" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.archivePaymentMethod(m.id)}>
-                              {m.archived ? <ArchiveRestore className="w-3.5 h-3.5 text-accent" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.deletePaymentMethod(m.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            metodos.map((m) => (
+              <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
+                <Wallet className="w-4 h-4 text-primary flex-shrink-0" />
+                {editingId === m.id ? (
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" disabled={mutating} />
+                ) : (
+                  <p className="flex-1 min-w-0 truncate">{m.nombre}</p>
+                )}
+                <Badge variant="outline" className="text-xs">#{m.id}</Badge>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {editingId === m.id ? (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => metodosPagoService.update(m.id, { nombre: editName.trim() }), () => setEditingId(null))} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(m.id); setEditName(m.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => metodosPagoService.remove(m.id))} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -1025,6 +1028,32 @@ export function AdminPanel() {
     ? `Error: ${backendCategoriasError.message}`
     : "Organiza los productos por género o tipo";
 
+  // Live Pais list from the backend, shared with CountriesSection.
+  const {
+    data: backendPaises,
+    loading: backendPaisesLoading,
+    error: backendPaisesError,
+    refresh: refreshPaises,
+  } = useFetch(() => paisesService.list(), []);
+  const paisesSubtitle = backendPaisesLoading
+    ? "Cargando países del backend…"
+    : backendPaisesError
+    ? `Error: ${backendPaisesError.message}`
+    : "Configura los países disponibles y sus monedas";
+
+  // Live Metodo_Pago list from the backend, shared with PaymentMethodsSection.
+  const {
+    data: backendMetodos,
+    loading: backendMetodosLoading,
+    error: backendMetodosError,
+    refresh: refreshMetodos,
+  } = useFetch(() => metodosPagoService.list(), []);
+  const metodosSubtitle = backendMetodosLoading
+    ? "Cargando métodos del backend…"
+    : backendMetodosError
+    ? `Error: ${backendMetodosError.message}`
+    : "Gestiona las opciones de pago por país";
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1087,19 +1116,33 @@ export function AdminPanel() {
           <AdminExpandableCard
             icon={<Globe className="w-5 h-5" />}
             title="Países y Monedas"
-            subtitle="Configura los países disponibles y sus monedas"
+            subtitle={paisesSubtitle}
             accentColor="bg-amber-500/10 text-amber-600"
+            count={backendPaises?.length}
+            countLabel="países"
           >
-            <CountriesSection />
+            <CountriesSection
+              paises={backendPaises}
+              loading={backendPaisesLoading}
+              error={backendPaisesError}
+              refresh={refreshPaises}
+            />
           </AdminExpandableCard>
 
           <AdminExpandableCard
             icon={<Wallet className="w-5 h-5" />}
             title="Métodos de Pago"
-            subtitle="Gestiona las opciones de pago por país"
+            subtitle={metodosSubtitle}
             accentColor="bg-emerald-500/10 text-emerald-600"
+            count={backendMetodos?.length}
+            countLabel="métodos"
           >
-            <PaymentMethodsSection />
+            <PaymentMethodsSection
+              metodos={backendMetodos}
+              loading={backendMetodosLoading}
+              error={backendMetodosError}
+              refresh={refreshMetodos}
+            />
           </AdminExpandableCard>
         </div>
 
