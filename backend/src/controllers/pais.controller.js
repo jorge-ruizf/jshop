@@ -1,5 +1,7 @@
 import { prisma } from '../services/prisma.js';
 
+// Sin cambios estructurales. Se añade include en getById para mayor contexto.
+
 export async function listPaises(req, res, next) {
   try {
     res.json(await prisma.pais.findMany());
@@ -8,7 +10,10 @@ export async function listPaises(req, res, next) {
 
 export async function getPais(req, res, next) {
   try {
-    const item = await prisma.pais.findUnique({ where: { id: req.id } });
+    const item = await prisma.pais.findUnique({
+      where: { id: req.id },
+      include: { metodos_pago: true },
+    });
     if (!item) return res.status(404).json({ error: { message: 'Pais not found' } });
     res.json(item);
   } catch (err) { next(err); }

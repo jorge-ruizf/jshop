@@ -1,9 +1,19 @@
 import { prisma } from '../services/prisma.js';
 
+// CAMBIOS vs versión anterior:
+// ❌ usuario_a / usuario_b eliminados — Chat NO tiene usuarios directos en el schema.
+// ✅ Chat pertenece a una Venta_X_Producto (relación 1-a-1, @unique).
+// ✅ include actualizado: venta_x_producto, mensajes, imagenes_mensaje.
+// ✅ orderBy mensajes por 'fecha' (el schema no tiene 'enviado_en').
+// ✅ createChat recibe id_venta_x_producto + fecha.
+
 export async function listChats(req, res, next) {
   try {
     res.json(await prisma.chat.findMany({
-      include: { usuario_a: true, usuario_b: true },
+      include: {
+        venta_x_producto: { include: { producto: true, venta: true } },
+        mensajes: { orderBy: { fecha: 'asc' } },
+      },
     }));
   } catch (err) { next(err); }
 }
@@ -13,9 +23,12 @@ export async function getChat(req, res, next) {
     const item = await prisma.chat.findUnique({
       where: { id: req.id },
       include: {
-        usuario_a: true,
-        usuario_b: true,
-        mensajes: { orderBy: { enviado_en: 'asc' }, include: { imagenes: true } },
+        venta_x_producto: { include: { producto: true, venta: true } },
+        mensajes: {
+          orderBy: { fecha: 'asc' },
+          include: { usuario: true },
+        },
+        imagenes_mensaje: { include: { tipo_imagen: true } },
       },
     });
     if (!item) return res.status(404).json({ error: { message: 'Chat not found' } });
@@ -25,17 +38,24 @@ export async function getChat(req, res, next) {
 
 export async function createChat(req, res, next) {
   try {
-    const { id_usuario_a, id_usuario_b } = req.body;
-    res.status(201).json(await prisma.chat.create({ data: { id_usuario_a, id_usuario_b } }));
+    const { id_venta_x_producto, fecha } = req.body;
+    res.status(201).json(await prisma.chat.create({
+      data: {
+        id_venta_x_producto,
+        fecha: fecha ? new Date(fecha) : new Date(),
+      },
+      include: { venta_x_producto: true },
+    }));
   } catch (err) { next(err); }
 }
 
+// Update solo permite cambiar la fecha; el vínculo con venta_x_producto es inmutable.
 export async function updateChat(req, res, next) {
   try {
-    const { id_usuario_a, id_usuario_b } = req.body;
+    const { fecha } = req.body;
     res.json(await prisma.chat.update({
       where: { id: req.id },
-      data: { id_usuario_a, id_usuario_b },
+      data: { fecha: new Date(fecha) },
     }));
   } catch (err) { next(err); }
 }

@@ -2,7 +2,12 @@ import { prisma } from '../services/prisma.js';
 
 export async function listCarrito(req, res, next) {
   try {
-    res.json(await prisma.carrito.findMany({ include: { producto: true, usuario: true } }));
+    const where = {};
+    if (req.query.id_usuario) where.id_usuario = Number(req.query.id_usuario);
+    res.json(await prisma.carrito.findMany({
+      where,
+      include: { producto: true, usuario: true },
+    }));
   } catch (err) { next(err); }
 }
 
@@ -20,19 +25,17 @@ export async function getCarrito(req, res, next) {
 export async function createCarrito(req, res, next) {
   try {
     const { id_producto, id_usuario } = req.body;
-    const created = await prisma.carrito.create({ data: { id_producto, id_usuario } });
-    res.status(201).json(created);
+    res.status(201).json(await prisma.carrito.create({ data: { id_producto, id_usuario } }));
   } catch (err) { next(err); }
 }
 
 export async function updateCarrito(req, res, next) {
   try {
     const { id_producto, id_usuario } = req.body;
-    const updated = await prisma.carrito.update({
+    res.json(await prisma.carrito.update({
       where: { id: req.id },
       data: { id_producto, id_usuario },
-    });
-    res.json(updated);
+    }));
   } catch (err) { next(err); }
 }
 

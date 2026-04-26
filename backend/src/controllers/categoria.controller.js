@@ -1,5 +1,7 @@
 import { prisma } from '../services/prisma.js';
 
+// No relaciones en el schema para Categoria salvo la inversa con Producto,
+// se incluye para tener contexto al consultar una categoría individual.
 export async function listCategorias(req, res, next) {
   try {
     res.json(await prisma.categoria.findMany());
@@ -8,7 +10,10 @@ export async function listCategorias(req, res, next) {
 
 export async function getCategoria(req, res, next) {
   try {
-    const item = await prisma.categoria.findUnique({ where: { id: req.id } });
+    const item = await prisma.categoria.findUnique({
+      where: { id: req.id },
+      include: { productos: true },
+    });
     if (!item) return res.status(404).json({ error: { message: 'Categoria not found' } });
     res.json(item);
   } catch (err) { next(err); }
