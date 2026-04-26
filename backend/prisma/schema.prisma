@@ -1,108 +1,164 @@
+// ============================================================
+//  schema.prisma — e-shop cuentas & videojuegos
+//  Generado desde diagrama ER (draw.io)
+// ============================================================
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
-model Usuario {
-  id                 Int     @id @default(autoincrement())
-  nombre             String
-  usuario            String  @unique
-  correo             String  @unique
-  id_pais            Int
-  id_rol             Int
-  id_metodo_pago_fav Int
+// ────────────────────────────────────────────────────────────
+//  CATÁLOGOS BASE (sin dependencias)
+// ────────────────────────────────────────────────────────────
 
-  pais             Pais        @relation(fields: [id_pais], references: [id])
-  rol              Rol         @relation(fields: [id_rol], references: [id])
-  metodo_pago_fav  Metodo_Pago @relation(fields: [id_metodo_pago_fav], references: [id])
+model Rol {
+  id      Int    @id @default(autoincrement())
+  nombre  String @db.VarChar(100)
 
-  productos          Producto[]         @relation("ProductoVendedor")
-  ventas             Venta[]
-  carrito            Carrito[]
-  productos_deseados Producto_Deseado[]
-  chats_a            Chat[]             @relation("ChatUsuarioA")
-  chats_b            Chat[]             @relation("ChatUsuarioB")
-  mensajes           Mensaje[]
-  valoraciones       Valoracion[]
-  notificaciones     Notificacion[]
-}
+  usuarios Usuario[]
 
-model Producto {
-  id           Int    @id @default(autoincrement())
-  nombre       String
-  descripcion  String
-  id_vendedor  Int
-  id_categoria Int
-  id_pais      Int
-
-  vendedor  Usuario   @relation("ProductoVendedor", fields: [id_vendedor], references: [id])
-  categoria Categoria @relation(fields: [id_categoria], references: [id])
-  pais      Pais      @relation(fields: [id_pais], references: [id])
-
-  ventas_x_producto Venta_x_Producto[]
-  carrito           Carrito[]
-  deseados          Producto_Deseado[]
-  precios           Precio[]
-  imagenes          Imagen_Producto[]
-  valoraciones      Valoracion[]
-}
-
-model Categoria {
-  id     Int    @id @default(autoincrement())
-  nombre String
-
-  productos Producto[]
+  @@map("tbl_rol")
 }
 
 model Pais {
   id     Int    @id @default(autoincrement())
-  nombre String
+  nombre String @db.VarChar(100)
 
-  usuarios  Usuario[]
-  productos Producto[]
-  precios   Precio[]
-}
+  usuarios     Usuario[]
+  metodos_pago Metodo_Pago[]
+  productos    Producto[]
+  precios      Precio[]
 
-model Rol {
-  id     Int    @id @default(autoincrement())
-  nombre String
-
-  usuarios Usuario[]
+  @@map("tbl_pais")
 }
 
 model Metodo_Pago {
+  id      Int    @id @default(autoincrement())
+  nombre  String @db.VarChar(100)
+  id_pais Int
+
+  pais     Pais     @relation(fields: [id_pais], references: [id])
+  usuarios Usuario[] // usuarios que lo tienen como favorito
+  ventas   Venta[]
+
+  @@map("tbl_metodo_pago")
+}
+
+model Categoria {
   id     Int    @id @default(autoincrement())
-  nombre String
+  nombre String @db.VarChar(100)
 
-  usuarios_fav Usuario[]
-  ventas       Venta[]
+  productos Producto[]
+
+  @@map("tbl_categoria")
 }
 
-model Venta {
-  id          Int @id @default(autoincrement())
-  id_usuario  Int
-  metodo_pago Int
+model Videojuego {
+  id     Int    @id @default(autoincrement())
+  nombre String @db.VarChar(100)
 
-  usuario      Usuario     @relation(fields: [id_usuario], references: [id])
-  metodoPago   Metodo_Pago @relation(fields: [metodo_pago], references: [id])
+  productos Producto[]
 
-  ventas_x_producto Venta_x_Producto[]
+  @@map("tbl_videojuego")
 }
 
-model Venta_x_Producto {
-  id          Int   @id @default(autoincrement())
+model Tipo_Imagen {
+  id     Int    @id @default(autoincrement())
+  nombre String @db.VarChar(100)
+
+  imagenes_producto Imagen_Producto[]
+  imagenes_mensaje  Imagen_Mensaje[]
+
+  @@map("tbl_tipo_imagen")
+}
+
+// ────────────────────────────────────────────────────────────
+//  USUARIO
+// ────────────────────────────────────────────────────────────
+
+model Usuario {
+  id                 Int    @id @default(autoincrement())
+  nombre             String @db.VarChar(100)
+  usuario            String @db.VarChar(50)
+  ventas             Int    // int(20) — contador de ventas realizadas
+  correo             String @db.VarChar(200)
+  id_pais            Int
+  id_rol             Int
+  id_metodo_pago_fav Int
+
+  pais            Pais        @relation(fields: [id_pais], references: [id])
+  rol             Rol         @relation(fields: [id_rol], references: [id])
+  metodo_pago_fav Metodo_Pago @relation(fields: [id_metodo_pago_fav], references: [id])
+
+  ventas_realizadas  Venta[]
+  mensajes           Mensaje[]
+  carrito            Carrito[]
+  productos_deseados Producto_Deseado[]
+  productos_vendidos Producto[]         @relation("Vendedor")
+
+  @@map("tbl_usuario")
+}
+
+// ────────────────────────────────────────────────────────────
+//  PRODUCTO
+// ────────────────────────────────────────────────────────────
+
+model Producto {
+  id            Int    @id @default(autoincrement())
+  nombre        String @db.VarChar(100)
+  descripcion   String @db.Text
+  id_vendedor   Int
+  id_pais       Int
+  id_categoria  Int
+  id_videojuego Int
+
+  vendedor   Usuario    @relation("Vendedor", fields: [id_vendedor], references: [id])
+  pais       Pais       @relation(fields: [id_pais], references: [id])
+  categoria  Categoria  @relation(fields: [id_categoria], references: [id])
+  videojuego Videojuego @relation(fields: [id_videojuego], references: [id])
+
+  imagenes           Imagen_Producto[]
+  precios            Precio[]
+  carrito            Carrito[]
+  productos_deseados Producto_Deseado[]
+  venta_x_productos  Venta_X_Producto[]
+
+  @@map("tbl_producto")
+}
+
+model Precio {
+  id          Int     @id @default(autoincrement())
+  precio      Decimal @db.Decimal(20, 2)
+  id_pais     Int
   id_producto Int
-  id_venta    Int
-  cantidad    Int
-  precio      Float
 
+  pais     Pais    @relation(fields: [id_pais], references: [id])
   producto Producto @relation(fields: [id_producto], references: [id])
-  venta    Venta    @relation(fields: [id_venta], references: [id])
+
+  @@map("tbl_precio")
 }
+
+model Imagen_Producto {
+  id             Int    @id @default(autoincrement())
+  nombre         String @db.VarChar(100)
+  ruta           String @db.VarChar(150)
+  id_producto    Int
+  id_tipo_imagen Int
+
+  producto    Producto    @relation(fields: [id_producto], references: [id])
+  tipo_imagen Tipo_Imagen @relation(fields: [id_tipo_imagen], references: [id])
+
+  @@map("tbl_imagen_producto")
+}
+
+// ────────────────────────────────────────────────────────────
+//  CARRITO & PRODUCTO DESEADO
+// ────────────────────────────────────────────────────────────
 
 model Carrito {
   id          Int @id @default(autoincrement())
@@ -111,89 +167,124 @@ model Carrito {
 
   producto Producto @relation(fields: [id_producto], references: [id])
   usuario  Usuario  @relation(fields: [id_usuario], references: [id])
+
+  @@map("tbl_carrito")
 }
 
 model Producto_Deseado {
-  id          Int @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
+  precio_objetivo Decimal @db.Decimal(20, 2)
+  id_producto     Int
+  id_usuario      Int
+
+  producto       Producto       @relation(fields: [id_producto], references: [id])
+  usuario        Usuario        @relation(fields: [id_usuario], references: [id])
+  notificaciones Notificacion[]
+
+  @@map("tbl_producto_deseado")
+}
+
+// ────────────────────────────────────────────────────────────
+//  VENTA
+// ────────────────────────────────────────────────────────────
+
+model Venta {
+  id             Int      @id @default(autoincrement())
+  total          Decimal  @db.Decimal(30, 2)
+  fecha          DateTime
+  id_usuario     Int
+  id_metodo_pago Int
+
+  usuario     Usuario     @relation(fields: [id_usuario], references: [id])
+  metodo_pago Metodo_Pago @relation(fields: [id_metodo_pago], references: [id])
+
+  venta_x_productos Venta_X_Producto[]
+
+  @@map("tbl_venta")
+}
+
+model Venta_X_Producto {
+  id          Int     @id @default(autoincrement())
   id_producto Int
-  id_usuario  Int
+  id_venta    Int
+  cantidad    Int     // int(5)
+  precio      Decimal @db.Decimal(20, 2)
 
   producto Producto @relation(fields: [id_producto], references: [id])
-  usuario  Usuario  @relation(fields: [id_usuario], references: [id])
+  venta    Venta    @relation(fields: [id_venta], references: [id])
+
+  // relaciones inversas 1-a-1
+  chat       Chat?
+  valoracion Valoracion?
+
+  @@map("tbl_venta_x_producto")
 }
 
-model Precio {
-  id          Int   @id @default(autoincrement())
-  id_producto Int
-  id_pais     Int
-  precio      Float
-
-  producto Producto @relation(fields: [id_producto], references: [id])
-  pais     Pais     @relation(fields: [id_pais], references: [id])
-}
-
-model Videojuego {
-  id     Int    @id @default(autoincrement())
-  nombre String
-}
+// ────────────────────────────────────────────────────────────
+//  CHAT & MENSAJES
+// ────────────────────────────────────────────────────────────
 
 model Chat {
-  id            Int      @id @default(autoincrement())
-  id_usuario_a  Int
-  id_usuario_b  Int
-  creado_en     DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  fecha               DateTime
+  id_venta_x_producto Int      @unique // 1 chat por línea de venta
 
-  usuario_a Usuario   @relation("ChatUsuarioA", fields: [id_usuario_a], references: [id])
-  usuario_b Usuario   @relation("ChatUsuarioB", fields: [id_usuario_b], references: [id])
-  mensajes  Mensaje[]
+  venta_x_producto Venta_X_Producto @relation(fields: [id_venta_x_producto], references: [id])
+
+  mensajes         Mensaje[]
+  imagenes_mensaje Imagen_Mensaje[]
+
+  @@map("tbl_chat")
 }
 
 model Mensaje {
   id         Int      @id @default(autoincrement())
+  fecha      DateTime
+  contenido  String   @db.Text
   id_chat    Int
   id_usuario Int
-  contenido  String
-  enviado_en DateTime @default(now())
 
-  chat     Chat              @relation(fields: [id_chat], references: [id])
-  usuario  Usuario           @relation(fields: [id_usuario], references: [id])
-  imagenes Imagen_Mensaje[]
+  chat    Chat    @relation(fields: [id_chat], references: [id])
+  usuario Usuario @relation(fields: [id_usuario], references: [id])
+
+  @@map("tbl_mensaje")
 }
 
 model Imagen_Mensaje {
-  id         Int    @id @default(autoincrement())
-  id_mensaje Int
-  url        String
+  id             Int      @id @default(autoincrement())
+  ruta           String   @db.VarChar(150)
+  fecha          DateTime
+  id_tipo_imagen Int
+  id_chat        Int
 
-  mensaje Mensaje @relation(fields: [id_mensaje], references: [id])
+  tipo_imagen Tipo_Imagen @relation(fields: [id_tipo_imagen], references: [id])
+  chat        Chat        @relation(fields: [id_chat], references: [id])
+
+  @@map("tbl_imagen_mensaje")
 }
 
-model Imagen_Producto {
-  id          Int    @id @default(autoincrement())
-  id_producto Int
-  url         String
-
-  producto Producto @relation(fields: [id_producto], references: [id])
-}
+// ────────────────────────────────────────────────────────────
+//  VALORACIÓN & NOTIFICACIÓN
+// ────────────────────────────────────────────────────────────
 
 model Valoracion {
-  id          Int      @id @default(autoincrement())
-  id_usuario  Int
-  id_producto Int
-  puntuacion  Int
-  comentario  String?
-  creado_en   DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  fecha               DateTime
+  puntaje             Int
+  id_venta_x_producto Int      @unique // 1 valoración por línea de venta
 
-  usuario  Usuario  @relation(fields: [id_usuario], references: [id])
-  producto Producto @relation(fields: [id_producto], references: [id])
+  venta_x_producto Venta_X_Producto @relation(fields: [id_venta_x_producto], references: [id])
+
+  @@map("tbl_valoracion")
 }
 
 model Notificacion {
-  id         Int      @id @default(autoincrement())
-  id_usuario Int
-  contenido  String
-  leida      Boolean  @default(false)
-  creado_en  DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  fecha_notificado    DateTime
+  descripcion         String   @db.Text
+  id_producto_deseado Int
 
-  usuario Usuario @relation(fields: [id_usuario], references: [id])
+  producto_deseado Producto_Deseado @relation(fields: [id_producto_deseado], references: [id])
+
+  @@map("tbl_notificacion")
 }
