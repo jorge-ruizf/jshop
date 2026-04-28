@@ -1,4 +1,5 @@
 const BASE_URL = "https://jshop-edzf.onrender.com/api";
+console.log("API VERSION: HARDCODED OK");
 
 export class ApiError extends Error {
   status: number;
