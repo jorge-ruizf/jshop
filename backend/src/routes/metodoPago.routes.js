@@ -8,7 +8,8 @@ const metodoPagoRouter = Router();
 
 metodoPagoRouter.get('/', listMetodosPago);
 metodoPagoRouter.get('/:id', parseId, getMetodoPago);
-metodoPagoRouter.post('/', requireFields(['nombre']), createMetodoPago);
+// ✅ añadido id_pais (FK requerida en el schema — estaba ausente)
+metodoPagoRouter.post('/', requireFields(['nombre', 'id_pais']), createMetodoPago);
 metodoPagoRouter.put('/:id', parseId, requireFields(['nombre']), updateMetodoPago);
 metodoPagoRouter.delete('/:id', parseId, deleteMetodoPago);
 

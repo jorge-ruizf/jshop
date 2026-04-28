@@ -8,7 +8,8 @@ const imagenProductoRouter = Router();
 
 imagenProductoRouter.get('/', listImagenesProducto);
 imagenProductoRouter.get('/:id', parseId, getImagenProducto);
-imagenProductoRouter.post('/', requireFields(['id_producto', 'url']), createImagenProducto);
+// ✅ url eliminado → ruta; añadidos nombre e id_tipo_imagen (requeridos en schema)
+imagenProductoRouter.post('/', requireFields(['id_producto', 'id_tipo_imagen', 'nombre', 'ruta']), createImagenProducto);
 imagenProductoRouter.put('/:id', parseId, updateImagenProducto);
 imagenProductoRouter.delete('/:id', parseId, deleteImagenProducto);
 

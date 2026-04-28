@@ -94,7 +94,9 @@ function SellerBanner({
         className="w-14 h-14 rounded-full object-cover ring-2 ring-primary/30"
         onError={(e) => {
           (e.target as HTMLImageElement).src =
-            "https://ui-avatars.com/api/?name=" + encodeURIComponent(seller.displayName) + "&size=56";
+            "https://ui-avatars.com/api/?name=" +
+            encodeURIComponent(seller.displayName) +
+            "&size=56";
         }}
       />
 
@@ -117,7 +119,11 @@ function SellerBanner({
           </span>
           <span className="flex items-center gap-1">
             <Users className="w-3.5 h-3.5" />
-            Miembro desde {new Date(seller.joinedDate).toLocaleDateString("es-ES", { year: "numeric", month: "long" })}
+            Miembro desde{" "}
+            {new Date(seller.joinedDate).toLocaleDateString("es-ES", {
+              year: "numeric",
+              month: "long",
+            })}
           </span>
         </div>
       </div>
@@ -137,22 +143,18 @@ export function Store() {
     data: productos,
     loading,
     error,
-  } = useFetch(() => productosService.list(), []);
+  } = useFetch((signal) => productosService.list(signal), []);
 
-  // Fetch real Categorias from the backend. Mock list from the store-context
-  // is kept as a fallback so the UI never disappears when the API is down.
+  // Fetch real Categorias from the backend.
   const {
     data: categorias,
     loading: categoriasLoading,
     error: categoriasError,
-  } = useFetch(() => categoriasService.list(), []);
+  } = useFetch((signal) => categoriasService.list(signal), []);
 
   const activeCategories = store.getActiveCategories();
   const selectedSeller = selectedSellerId ? store.getSeller(selectedSellerId) : null;
 
-  // Map backend Producto -> the shape used by the existing Card UI.
-  // Fields not present on the backend model use safe defaults so the
-  // existing visual structure is preserved.
   const filteredProductos = productos ?? [];
 
   const clearSellerFilter = () => {
@@ -178,7 +180,6 @@ export function Store() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
         {/* Seller Banner (when filtering by seller) */}
         {selectedSeller && (
           <SellerBanner
@@ -220,7 +221,9 @@ export function Store() {
                       key={cat.id}
                       variant={selectedCategory === cat.nombre ? "default" : "outline"}
                       onClick={() => setSelectedCategory(cat.nombre)}
-                      className={selectedCategory === cat.nombre ? "bg-primary hover:bg-primary/90" : ""}
+                      className={
+                        selectedCategory === cat.nombre ? "bg-primary hover:bg-primary/90" : ""
+                      }
                     >
                       {cat.nombre}
                     </Button>
@@ -230,9 +233,6 @@ export function Store() {
             )}
           </div>
         )}
-        {/* Reference kept so the legacy mock-driven categories list stays
-            tree-shaken without warnings while only Categoria from the backend
-            is wired in this iteration. */}
         {void activeCategories}
 
         {/* Section title when filtering */}
@@ -278,9 +278,7 @@ export function Store() {
                         "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=200&fit=crop";
                     }}
                   />
-                  <Badge className="absolute top-2 right-2 bg-accent">
-                    Producto
-                  </Badge>
+                  <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
                 </div>
                 <div className="p-4">
                   <h3 className="mb-1 line-clamp-1">{producto.nombre}</h3>

@@ -30,9 +30,21 @@ export interface Pais {
   nombre: string;
 }
 
+export interface Videojuego {
+  id: number;
+  nombre: string;
+}
+
 export interface MetodoPago {
   id: number;
   nombre: string;
+  id_pais: number;
+}
+
+export interface ImagenProducto {
+  id: number;
+  id_producto: number;
+  url: string;
 }
 
 export interface Venta {

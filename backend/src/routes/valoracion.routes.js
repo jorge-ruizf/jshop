@@ -8,11 +8,9 @@ const valoracionRouter = Router();
 
 valoracionRouter.get('/', listValoraciones);
 valoracionRouter.get('/:id', parseId, getValoracion);
-valoracionRouter.post(
-  '/',
-  requireFields(['id_usuario', 'id_producto', 'puntuacion']),
-  createValoracion,
-);
+// ✅ id_usuario / id_producto / puntuacion eliminados
+// ✅ FK correcta: id_venta_x_producto; campo renombrado: puntuacion → puntaje
+valoracionRouter.post('/', requireFields(['id_venta_x_producto', 'puntaje']), createValoracion);
 valoracionRouter.put('/:id', parseId, updateValoracion);
 valoracionRouter.delete('/:id', parseId, deleteValoracion);
 

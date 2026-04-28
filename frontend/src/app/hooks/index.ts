@@ -1,1 +1,3 @@
-export { useFetch } from "./useFetch";
+// Barrel export for hooks
+
+export * from "./useFetch";

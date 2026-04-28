@@ -8,7 +8,9 @@ const imagenMensajeRouter = Router();
 
 imagenMensajeRouter.get('/', listImagenesMensaje);
 imagenMensajeRouter.get('/:id', parseId, getImagenMensaje);
-imagenMensajeRouter.post('/', requireFields(['id_mensaje', 'url']), createImagenMensaje);
+// ✅ id_mensaje / url eliminados
+// ✅ FK correcta es id_chat; campo renombrado url → ruta; id_tipo_imagen es requerido
+imagenMensajeRouter.post('/', requireFields(['id_chat', 'id_tipo_imagen', 'ruta']), createImagenMensaje);
 imagenMensajeRouter.put('/:id', parseId, updateImagenMensaje);
 imagenMensajeRouter.delete('/:id', parseId, deleteImagenMensaje);
 

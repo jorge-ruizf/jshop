@@ -8,9 +8,10 @@ const productoRouter = Router();
 
 productoRouter.get('/', listProductos);
 productoRouter.get('/:id', parseId, getProducto);
+// ✅ añadido id_videojuego (FK requerida en el schema — estaba ausente)
 productoRouter.post(
   '/',
-  requireFields(['nombre', 'descripcion', 'id_vendedor', 'id_categoria', 'id_pais']),
+  requireFields(['nombre', 'descripcion', 'id_vendedor', 'id_pais', 'id_categoria', 'id_videojuego']),
   createProducto,
 );
 productoRouter.put('/:id', parseId, updateProducto);

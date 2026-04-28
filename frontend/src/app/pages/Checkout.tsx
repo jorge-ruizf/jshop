@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -6,15 +6,12 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Separator } from "../components/ui/separator";
-import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Star, Loader2 } from "lucide-react";
-import { useStore } from "../data/store-context";
+import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Loader2 } from "lucide-react";
 import { useFetch } from "../hooks/useFetch";
 import { productosService, paisesService, metodosPagoService } from "../services";
 import type { Producto } from "../services/types";
-import { useEffect } from "react";
 
-// Shape used by the existing rendering code below. Kept identical so the
-// JSX (image, title, price, quantity) does not need to change.
+// Shape used by the existing rendering code below.
 type CartItem = {
   id: string;
   title: string;
@@ -39,37 +36,37 @@ function productoToCartItem(p: Producto): CartItem {
 
 export function Checkout() {
   const navigate = useNavigate();
-  const store = useStore();
+
   const {
     data: productos,
     loading: productosLoading,
     error: productosError,
-  } = useFetch(() => productosService.list(), []);
+  } = useFetch((signal) => productosService.list(signal), []);
+
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
   // Sync cart items with backend Productos once they arrive.
   useEffect(() => {
     if (productos) setCartItems(productos.map(productoToCartItem));
   }, [productos]);
+
   const [onHoldItems, setOnHoldItems] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentCountry, setPaymentCountry] = useState("");
 
-  // Backend-driven Pais list for the country selector. Backend Pais only has
-  // { id, nombre } so flag/currency are not displayed. The "internacional"
-  // option is gone — there is no equivalent in the schema yet.
+  // Backend-driven Pais list for the country selector.
   const {
     data: backendPaises,
     loading: paisesLoading,
     error: paisesError,
-  } = useFetch(() => paisesService.list(), []);
+  } = useFetch((signal) => paisesService.list(signal), []);
 
-  // Backend-driven MetodoPago list. The backend has no per-country relation
-  // yet, so the same list is shown regardless of the selected paymentCountry.
+  // Backend-driven MetodoPago list.
   const {
     data: backendMetodos,
     loading: metodosLoading,
     error: metodosError,
-  } = useFetch(() => metodosPagoService.list(), []);
+  } = useFetch((signal) => metodosPagoService.list(signal), []);
 
   // Default the paymentCountry to the first available backend country.
   useEffect(() => {
@@ -94,17 +91,14 @@ export function Checkout() {
 
   const toggleOnHold = (id: string) => {
     setOnHoldItems((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
   const activeItems = cartItems.filter((item) => !onHoldItems.includes(item.id));
   const holdItems = cartItems.filter((item) => onHoldItems.includes(item.id));
 
-  const subtotal = activeItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const subtotal = activeItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
@@ -120,36 +114,22 @@ export function Checkout() {
     navigate("/");
   };
 
-  // Helper to get stock for a cart item
-  const getGameStock = (gameId: string) => {
-    const game = store.games.find((g) => g.id === gameId);
-    return game ? game.stock : "unlimited";
-  };
-
-  // Helper to get seller for a cart item
-  const getGameSeller = (gameId: string) => {
-    const game = store.games.find((g) => g.id === gameId);
-    if (!game?.sellerId) return undefined;
-    return store.getSeller(game.sellerId);
-  };
+  // Stock and seller info are not yet available on the backend Producto model.
+  // These helpers return safe defaults so the UI renders without errors.
+  const getGameStock = (_gameId: string): "unlimited" | number => "unlimited";
+  const getGameSeller = (_gameId: string) => undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => navigate("/")} className="mb-4">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a la tienda
           </Button>
           <h1 className="mb-2">Finalizar Compra</h1>
-          <p className="text-muted-foreground">
-            Revisa tu pedido y completa el pago
-          </p>
+          <p className="text-muted-foreground">Revisa tu pedido y completa el pago</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -191,25 +171,11 @@ export function Checkout() {
                               />
                               <div className="flex-1">
                                 <h3 className="mb-1">{item.title}</h3>
-                                {/* Seller info */}
                                 {seller && (
                                   <div className="flex items-center gap-2 mb-2 py-1.5 px-2.5 rounded-md bg-background/60 border border-border/50 w-fit">
-                                    <img
-                                      src={seller.avatar}
-                                      alt={seller.displayName}
-                                      className="w-5 h-5 rounded-full object-cover ring-1 ring-amber-400/40 flex-shrink-0"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src =
-                                          "https://ui-avatars.com/api/?name=" + encodeURIComponent(seller.displayName) + "&size=20";
-                                      }}
-                                    />
-                                    <span className="text-xs text-muted-foreground">{seller.displayName}</span>
-                                    <span className="flex items-center gap-0.5">
-                                      {[1,2,3,4,5].map((i) => (
-                                        <Star key={i} className={`w-3 h-3 ${i <= Math.floor(seller.rating) ? "fill-amber-400 text-amber-400" : i === Math.floor(seller.rating)+1 && seller.rating - Math.floor(seller.rating) >= 0.5 ? "fill-amber-400/50 text-amber-400" : "fill-muted text-muted-foreground/30"}`} />
-                                      ))}
+                                    <span className="text-xs text-muted-foreground">
+                                      {(seller as { nombre?: string }).nombre}
                                     </span>
-                                    <span className="text-xs text-amber-500">{seller.rating.toFixed(1)}</span>
                                   </div>
                                 )}
                                 <p className="text-sm text-muted-foreground mb-1">
@@ -233,9 +199,7 @@ export function Checkout() {
                                     </Badge>
                                   )}
                                 </div>
-                                <p className="text-lg text-primary">
-                                  ${item.price.toFixed(2)}
-                                </p>
+                                <p className="text-lg text-primary">${item.price.toFixed(2)}</p>
                               </div>
                               <div className="flex gap-2 self-start">
                                 <Button
@@ -266,9 +230,7 @@ export function Checkout() {
                       <>
                         <Separator className="my-6" />
                         <div>
-                          <h3 className="text-sm mb-4 text-muted-foreground">
-                            En Espera
-                          </h3>
+                          <h3 className="text-sm mb-4 text-muted-foreground">En Espera</h3>
                           <div className="space-y-3">
                             {holdItems.map((item) => {
                               const itemStock = getGameStock(item.id);
@@ -287,25 +249,11 @@ export function Checkout() {
                                     <h3 className="mb-1 line-through text-muted-foreground">
                                       {item.title}
                                     </h3>
-                                    {/* Seller info (muted) */}
                                     {seller && (
                                       <div className="flex items-center gap-2 mb-2 py-1.5 px-2.5 rounded-md bg-background/40 border border-border/30 w-fit opacity-50">
-                                        <img
-                                          src={seller.avatar}
-                                          alt={seller.displayName}
-                                          className="w-5 h-5 rounded-full object-cover flex-shrink-0"
-                                          onError={(e) => {
-                                            (e.target as HTMLImageElement).src =
-                                              "https://ui-avatars.com/api/?name=" + encodeURIComponent(seller.displayName) + "&size=20";
-                                          }}
-                                        />
-                                        <span className="text-xs text-muted-foreground">{seller.displayName}</span>
-                                        <span className="flex items-center gap-0.5">
-                                          {[1,2,3,4,5].map((i) => (
-                                            <Star key={i} className={`w-3 h-3 ${i <= Math.floor(seller.rating) ? "fill-amber-400 text-amber-400" : "fill-muted text-muted-foreground/30"}`} />
-                                          ))}
+                                        <span className="text-xs text-muted-foreground">
+                                          {(seller as { nombre?: string }).nombre}
                                         </span>
-                                        <span className="text-xs text-amber-500">{seller.rating.toFixed(1)}</span>
                                       </div>
                                     )}
                                     <p className="text-sm text-muted-foreground mb-1 line-through">
@@ -385,11 +333,13 @@ export function Checkout() {
                     {!paisesLoading && !paisesError && (!backendPaises || backendPaises.length === 0) && (
                       <option value="">Sin países configurados</option>
                     )}
-                    {!paisesLoading && !paisesError && backendPaises?.map((opt) => (
-                      <option key={opt.id} value={String(opt.id)}>
-                        {opt.nombre}
-                      </option>
-                    ))}
+                    {!paisesLoading &&
+                      !paisesError &&
+                      backendPaises?.map((opt) => (
+                        <option key={opt.id} value={String(opt.id)}>
+                          {opt.nombre}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -412,10 +362,7 @@ export function Checkout() {
                     No hay métodos de pago configurados
                   </p>
                 ) : (
-                  <RadioGroup
-                    value={paymentMethod}
-                    onValueChange={setPaymentMethod}
-                  >
+                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                     <div className="space-y-3">
                       {backendMetodos.map((method) => (
                         <label
@@ -449,17 +396,13 @@ export function Checkout() {
                   <span>${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Impuestos (10%)
-                  </span>
+                  <span className="text-muted-foreground">Impuestos (10%)</span>
                   <span>${tax.toFixed(2)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
                   <span>Total</span>
-                  <span className="text-xl text-primary">
-                    ${total.toFixed(2)}
-                  </span>
+                  <span className="text-xl text-primary">${total.toFixed(2)}</span>
                 </div>
               </div>
 

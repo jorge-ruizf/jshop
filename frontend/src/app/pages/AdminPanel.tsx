@@ -5,10 +5,16 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
-import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService, categoriasService, paisesService, metodosPagoService } from "../services";
-import type { Pais, MetodoPago } from "../services/types";
+import {
+  productosService,
+  categoriasService,
+  paisesService,
+  videojuegoService,
+  metodosPagoService,
+  usuariosService,
+} from "../services";
+import type { Pais, Videojuego, MetodoPago, Producto, Usuario } from "../services/types";
 import {
   Plus,
   Upload,
@@ -29,6 +35,7 @@ import {
   Search,
   Star,
   UserPlus,
+  Loader2,
 } from "lucide-react";
 
 // ─── Reusable sub-tab component ─────────────────────────────────────────
@@ -82,67 +89,118 @@ function StarRatingDisplay({ rating }: { rating: number }) {
   );
 }
 
+// ─── Helper for consistent mutation loading ──────────────────────────────
+function useMutation() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutate = async (fn: () => Promise<unknown>) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { loading, error, mutate, clearError: () => setError(null) };
+}
+
 // ─── PRODUCTS SECTION ───────────────────────────────────────────────────
 function ProductsSection() {
-  const store = useStore();
   const [tab, setTab] = useState("add");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
 
-  // Add form state
-  const emptyPrices: Record<string, string> = {};
-  store.countries.forEach((c) => (emptyPrices[c.code] = ""));
+  const { data: categorias, loading: categoriasLoading } = useFetch(
+    (signal) => categoriasService.list(signal),
+    [],
+  );
+
+  const { data: paises, loading: paisesLoading } = useFetch(
+    (signal) => paisesService.list(signal),
+    [],
+  );
+
+  const { data: videojuegos, loading: videojuegosLoading } = useFetch(
+    (signal) => videojuegoService.list(signal),
+    [],
+  );
+
+  const { data: usuarios, loading: usuariosLoading } = useFetch(
+    (signal) => usuariosService.list(signal),
+    [],
+  );
+
+  const {
+    data: productos,
+    loading: productosLoading,
+    error: productosError,
+    refresh: refreshProductos,
+  } = useFetch((signal) => productosService.list(signal), []);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [prices, setPrices] = useState<Record<string, string>>(emptyPrices);
-  const [category, setCategory] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [paisId, setPaisId] = useState("");
+  const [videojuegoId, setVideojuegoId] = useState("");
+  const [vendedorId, setVendedorId] = useState("");
   const [image, setImage] = useState("");
-  const [stock, setStock] = useState("");
-  const [unlimitedStock, setUnlimitedStock] = useState(false);
-  const [sellerId, setSellerId] = useState("");
 
   const resetForm = () => {
     setTitle("");
     setDescription("");
-    const fresh: Record<string, string> = {};
-    store.countries.forEach((c) => (fresh[c.code] = ""));
-    setPrices(fresh);
-    setCategory("");
+    setCategoryId("");
+    setPaisId("");
+    setVideojuegoId("");
+    setVendedorId("");
     setImage("");
-    setStock("");
-    setUnlimitedStock(false);
-    setSellerId("");
   };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    const numPrices: Record<string, number> = {};
-    Object.keys(prices).forEach((k) => (numPrices[k] = parseFloat(prices[k]) || 0));
-    store.addGame({
-      title,
-      description,
-      prices: numPrices,
-      category,
-      image,
-      releaseDate: new Date().toISOString().split("T")[0],
-      stock: unlimitedStock ? "unlimited" : parseInt(stock) || 0,
-      sellerId: sellerId || undefined,
+    mutate(async () => {
+      await productosService.create({
+        nombre: title.trim(),
+        descripcion: description.trim(),
+        id_categoria: Number(categoryId),
+        id_pais: Number(paisId),
+        id_videojuego: Number(videojuegoId),
+        id_vendedor: Number(vendedorId) || 0,
+      });
+      resetForm();
+      refreshProductos();
     });
-    resetForm();
   };
 
-  const startEdit = (g: { id: string; title: string; description: string }) => {
-    setEditingId(g.id);
-    setEditTitle(g.title);
-    setEditDesc(g.description);
+  const startEdit = (p: Producto) => {
+    setEditingId(p.id);
+    setEditTitle(p.nombre);
+    setEditDesc(p.descripcion);
   };
+
   const saveEdit = () => {
-    if (editingId) {
-      store.updateGame(editingId, { title: editTitle, description: editDesc });
+    if (editingId === null) return;
+    mutate(async () => {
+      await productosService.update(editingId, {
+        nombre: editTitle.trim(),
+        descripcion: editDesc.trim(),
+      });
       setEditingId(null);
-    }
+      refreshProductos();
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    mutate(async () => {
+      await productosService.remove(id);
+      refreshProductos();
+    });
   };
 
   return (
@@ -156,50 +214,68 @@ function ProductsSection() {
         onChange={setTab}
       />
 
+      {mutationError && (
+        <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
+      )}
+
       {tab === "add" && (
         <form onSubmit={handleAdd} className="space-y-5">
           <div className="space-y-2">
             <Label>Título del Juego *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ej: The Legend of Zelda" required />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej: The Legend of Zelda"
+              required
+              disabled={mutating}
+            />
           </div>
           <div className="space-y-2">
             <Label>Descripción *</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe el juego..." rows={3} required />
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe el juego..."
+              rows={3}
+              required
+              disabled={mutating}
+            />
           </div>
 
-          {/* Seller */}
           <div className="space-y-2">
             <Label>Vendedor</Label>
             <select
-              value={sellerId}
-              onChange={(e) => setSellerId(e.target.value)}
+              value={vendedorId}
+              onChange={(e) => setVendedorId(e.target.value)}
+              disabled={usuariosLoading || mutating}
               className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="">Sin vendedor asignado</option>
-              {store.getActiveSellers().map((s) => (
-                <option key={s.id} value={s.id}>@{s.username} — {s.displayName}</option>
+              <option value="">
+                {usuariosLoading ? "Cargando usuarios…" : "Sin vendedor asignado"}
+              </option>
+              {(usuarios ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  @{u.usuario} — {u.nombre}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Stock */}
+          {/* Stock field — backend doesn't have stock yet */}
           <div className="space-y-2">
             <Label>Stock *</Label>
             <div className="flex gap-2">
               <Input
                 type="number"
                 min="0"
-                value={unlimitedStock ? "" : stock}
-                onChange={(e) => setStock(e.target.value)}
-                placeholder={unlimitedStock ? "Ilimitado" : "Cantidad"}
-                disabled={unlimitedStock}
+                placeholder="Cantidad"
                 className="flex-1"
+
               />
               <Button
                 type="button"
-                variant={unlimitedStock ? "default" : "outline"}
-                onClick={() => setUnlimitedStock(!unlimitedStock)}
-                className={unlimitedStock ? "bg-accent hover:bg-accent/90" : ""}
+                variant="outline"
+                disabled
               >
                 <Infinity className="w-4 h-4 mr-1" />
                 Ilimitado
@@ -207,118 +283,214 @@ function ProductsSection() {
             </div>
           </div>
 
-          {/* Category */}
           <div className="space-y-2">
             <Label>Categoría *</Label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               required
+              disabled={categoriasLoading || mutating}
               className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="">Selecciona una categoría</option>
-              {store.getActiveCategories().map((c) => (
-                <option key={c.id} value={c.name}>{c.name}</option>
+              <option value="">
+                {categoriasLoading ? "Cargando categorías…" : "Selecciona una categoría"}
+              </option>
+              {(categorias ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
               ))}
             </select>
           </div>
 
-          {/* Prices */}
-          <div className="space-y-3">
-            <div className="border-b pb-2">
-              <h4 className="text-[0.95rem]">Precios por País *</h4>
-              <p className="text-sm text-muted-foreground">Moneda local de cada país</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {store.countries.map((c) => (
-                <div key={c.code} className="space-y-1">
-                  <Label className="text-sm">{c.flag} {c.name} ({c.currency})</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={prices[c.code] || ""}
-                    onChange={(e) => setPrices({ ...prices, [c.code]: e.target.value })}
-                    placeholder="0"
-                    required
-                  />
-                </div>
+          <div className="space-y-2">
+            <Label>País *</Label>
+            <select
+                value={paisId}
+                onChange={(e) => setPaisId(e.target.value)}
+                required
+                disabled={paisesLoading || mutating}
+                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">
+                {paisesLoading ? "Cargando países…" : "Selecciona un país"}
+              </option>
+              {(paises ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* Image */}
+          <div className="space-y-2">
+            <Label>Videojuego *</Label>
+            <select
+                value={videojuegoId}
+                onChange={(e) => setVideojuegoId(e.target.value)}
+                required
+                disabled={videojuegosLoading || mutating}
+                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">
+                {videojuegosLoading ? "Cargando videojuegos…" : "Selecciona un videojuego"}
+              </option>
+              {(videojuegos ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+              ))}
+            </select>
+          </div>
+
           <div className="space-y-2">
             <Label>URL de la Imagen *</Label>
             <div className="flex gap-2">
-              <Input type="url" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://example.com/image.jpg" required className="flex-1" />
-              <Button type="button" variant="outline" size="icon"><Upload className="w-4 h-4" /></Button>
+              <Input
+                type="url"
+                value={image}
+                onChange={(e) => setImage(e.target.value)}
+                placeholder="https://example.com/image.jpg"
+                required
+                className="flex-1"
+                disabled={mutating}
+              />
+              <Button type="button" variant="outline" size="icon">
+                <Upload className="w-4 h-4" />
+              </Button>
             </div>
             {image && (
               <div className="mt-2 p-2 border rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Vista previa:</p>
-                <img src={image} alt="Preview" className="w-full max-w-xs h-32 object-cover rounded" onError={(e) => { (e.target as HTMLImageElement).src = "https://via.placeholder.com/300x200?text=Invalid"; }} />
+                <img
+                  src={image}
+                  alt="Preview"
+                  className="w-full max-w-xs h-32 object-cover rounded"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://via.placeholder.com/300x200?text=Invalid";
+                  }}
+                />
               </div>
             )}
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="submit" className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-1" /> Agregar Juego
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
+              <Plus className="w-4 h-4 mr-1" />
+              {mutating ? "Guardando…" : "Agregar Juego"}
             </Button>
-            <Button type="button" variant="outline" onClick={resetForm}>Limpiar</Button>
+            <Button type="button" variant="outline" onClick={resetForm} disabled={mutating}>
+              Limpiar
+            </Button>
           </div>
         </form>
       )}
 
       {tab === "manage" && (
         <div className="space-y-3">
-          {store.games.length === 0 ? (
+          {productosLoading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Cargando productos…
+            </div>
+          ) : productosError ? (
+            <p className="text-center py-8 text-destructive">
+              No se pudieron cargar los productos: {productosError.message}
+            </p>
+          ) : !productos || productos.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">No hay productos</p>
           ) : (
-            store.games.map((g) => {
-              const seller = g.sellerId ? store.getSeller(g.sellerId) : undefined;
+            productos.map((p) => {
+              const seller = (usuarios ?? []).find((u) => u.id === p.id_vendedor);
               return (
-                <div key={g.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${g.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"}`}>
-                  <img src={g.image} alt={g.title} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                <div
+                  key={p.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=56&h=56&fit=crop"
+                    alt={p.nombre}
+                    className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                  />
                   <div className="flex-1 min-w-0">
-                    {editingId === g.id ? (
+                    {editingId === p.id ? (
                       <div className="space-y-2">
-                        <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="h-8" />
-                        <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-8" />
+                        <Input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="h-8"
+                          disabled={mutating}
+                        />
+                        <Input
+                          value={editDesc}
+                          onChange={(e) => setEditDesc(e.target.value)}
+                          className="h-8"
+                          disabled={mutating}
+                        />
                       </div>
                     ) : (
                       <>
-                        <p className={`truncate ${g.archived ? "line-through text-muted-foreground" : ""}`}>{g.title}</p>
+                        <p className="truncate">{p.nombre}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <Badge variant="outline" className="text-xs">{g.category}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            Cat: {p.id_categoria}
+                          </Badge>
                           <span className="text-xs text-muted-foreground">
-                            Stock: {g.stock === "unlimited" ? "∞" : g.stock}
+                            Stock: ∞ {/* TODO: real stock */}
                           </span>
                           {seller && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                               <Users className="w-3 h-3" />
-                              @{seller.username}
+                              @{seller.usuario}
                             </span>
                           )}
-                          {g.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
                         </div>
                       </>
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {editingId === g.id ? (
+                    {editingId === p.id ? (
                       <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={saveEdit}><Check className="w-4 h-4 text-accent" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)}><X className="w-4 h-4" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={saveEdit}
+                          disabled={mutating}
+                        >
+                          <Check className="w-4 h-4 text-accent" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditingId(null)}
+                          disabled={mutating}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => startEdit(g)}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.archiveGame(g.id)}>
-                          {g.archived ? <ArchiveRestore className="w-3.5 h-3.5 text-accent" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => startEdit(p)}
+                          disabled={mutating}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.deleteGame(g.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleDelete(p.id)}
+                          disabled={mutating}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
                       </>
                     )}
                   </div>
@@ -333,74 +505,56 @@ function ProductsSection() {
 }
 
 // ─── CATEGORIES SECTION ─────────────────────────────────────────────────
-// Wired to backend Categoria via categoriasService. The mock store-context
-// helpers (store.addCategory / store.categories) are intentionally no longer
-// used here — Categoria is a single backend-owned entity for this iteration.
-function CategoriesSection({
-  categorias,
-  loading,
-  error,
-  refresh,
-}: {
-  categorias: { id: number; nombre: string }[] | null;
-  loading: boolean;
-  error: { message: string } | null;
-  refresh: () => void;
-}) {
+function CategoriesSection() {
+  const {
+    data: categorias,
+    loading,
+    error,
+    refresh,
+  } = useFetch((signal) => categoriasService.list(signal), []);
+
   const [tab, setTab] = useState("add");
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [mutating, setMutating] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    setMutating(true);
-    setMutationError(null);
-    try {
+    mutate(async () => {
       await categoriasService.create({ nombre: trimmed });
       setName("");
       refresh();
-    } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMutating(false);
-    }
+    });
   };
 
-  const handleSaveEdit = async (id: number) => {
-    setMutating(true);
-    setMutationError(null);
-    try {
+  const handleSaveEdit = (id: number) => {
+    mutate(async () => {
       await categoriasService.update(id, { nombre: editName.trim() });
       setEditingId(null);
       refresh();
-    } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMutating(false);
-    }
+    });
   };
 
-  const handleDelete = async (id: number) => {
-    setMutating(true);
-    setMutationError(null);
-    try {
+  const handleDelete = (id: number) => {
+    mutate(async () => {
       await categoriasService.remove(id);
       refresh();
-    } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMutating(false);
-    }
+    });
   };
 
   return (
     <>
-      <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
+      <SubTabs
+        tabs={[
+          { key: "add", label: "Agregar" },
+          { key: "manage", label: "Administrar" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {mutationError && (
         <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
@@ -408,9 +562,17 @@ function CategoriesSection({
 
       {tab === "add" && (
         <form onSubmit={handleAdd} className="flex gap-3">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la categoría" required className="flex-1" disabled={mutating} />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nombre de la categoría"
+            required
+            className="flex-1"
+            disabled={mutating}
+          />
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
-            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar"}
+            <Plus className="w-4 h-4 mr-1" />
+            {mutating ? "Guardando…" : "Agregar"}
           </Button>
         </form>
       )}
@@ -427,24 +589,66 @@ function CategoriesSection({
             <p className="text-center py-6 text-muted-foreground">No hay categorías</p>
           ) : (
             categorias.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30"
+              >
                 <Tag className="w-4 h-4 text-primary flex-shrink-0" />
                 {editingId === c.id ? (
-                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 h-8" disabled={mutating} />
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 h-8"
+                    disabled={mutating}
+                  />
                 ) : (
                   <span className="flex-1">{c.nombre}</span>
                 )}
-                <Badge variant="outline" className="text-xs">#{c.id}</Badge>
                 <div className="flex items-center gap-1">
                   {editingId === c.id ? (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSaveEdit(c.id)} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleSaveEdit(c.id)}
+                        disabled={mutating}
+                      >
+                        <Check className="w-4 h-4 text-accent" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingId(null)}
+                        disabled={mutating}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(c.id); setEditName(c.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDelete(c.id)} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditName(c.nombre);
+                        }}
+                        disabled={mutating}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleDelete(c.id)}
+                        disabled={mutating}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
                     </>
                   )}
                 </div>
@@ -458,52 +662,56 @@ function CategoriesSection({
 }
 
 // ─── COUNTRIES SECTION ──────────────────────────────────────────────────
-// Wired to backend Pais via paisesService. The backend Pais model only
-// stores { id, nombre } — code/flag/currency aren't persisted yet, so this
-// section now manages just the country name. The mock store-context country
-// helpers are intentionally unused here.
-function CountriesSection({
-  paises,
-  loading,
-  error,
-  refresh,
-}: {
-  paises: Pais[] | null;
-  loading: boolean;
-  error: { message: string } | null;
-  refresh: () => void;
-}) {
+function CountriesSection() {
+  const {
+    data: paises,
+    loading,
+    error,
+    refresh,
+  } = useFetch((signal) => paisesService.list(signal), []);
+
   const [tab, setTab] = useState("add");
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [mutating, setMutating] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
-
-  const runMutation = async (op: () => Promise<unknown>, after?: () => void) => {
-    setMutating(true);
-    setMutationError(null);
-    try {
-      await op();
-      after?.();
-      refresh();
-    } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMutating(false);
-    }
-  };
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    runMutation(() => paisesService.create({ nombre: trimmed }), () => setName(""));
+    mutate(async () => {
+      await paisesService.create({ nombre: trimmed });
+      setName("");
+      refresh();
+    });
+  };
+
+  const handleSaveEdit = (id: number) => {
+    mutate(async () => {
+      await paisesService.update(id, { nombre: editName.trim() });
+      setEditingId(null);
+      refresh();
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    mutate(async () => {
+      await paisesService.remove(id);
+      refresh();
+    });
   };
 
   return (
     <>
-      <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
+      <SubTabs
+        tabs={[
+          { key: "add", label: "Agregar" },
+          { key: "manage", label: "Administrar" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {mutationError && (
         <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
@@ -513,11 +721,20 @@ function CountriesSection({
         <form onSubmit={handleAdd} className="space-y-3">
           <div className="space-y-1">
             <Label className="text-sm">Nombre *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bolivia" required disabled={mutating} />
-            <p className="text-xs text-muted-foreground">El backend solo persiste el nombre.</p>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Bolivia"
+              required
+              disabled={mutating}
+            />
+            <p className="text-xs text-muted-foreground">
+              TODO: Los campos bandera y moneda no están disponibles en el backend aún
+            </p>
           </div>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
-            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar País"}
+            <Plus className="w-4 h-4 mr-1" />
+            {mutating ? "Guardando…" : "Agregar País"}
           </Button>
         </form>
       )}
@@ -534,26 +751,234 @@ function CountriesSection({
             <p className="text-center py-6 text-muted-foreground">No hay países configurados</p>
           ) : (
             paises.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30"
+              >
                 <span className="text-xl flex-shrink-0">🏳️</span>
                 {editingId === c.id ? (
-                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" placeholder="Nombre" disabled={mutating} />
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-8 flex-1"
+                    placeholder="Nombre"
+                    disabled={mutating}
+                  />
+                ) : (
+                  <div className="flex-1">
+                    <span>{c.nombre}</span>
+                    <span className="text-sm text-muted-foreground ml-2">
+                      (TODO: moneda)
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1">
+                  {editingId === c.id ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleSaveEdit(c.id)}
+                        disabled={mutating}
+                      >
+                        <Check className="w-4 h-4 text-accent" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingId(null)}
+                        disabled={mutating}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditName(c.nombre);
+                        }}
+                        disabled={mutating}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleDelete(c.id)}
+                        disabled={mutating}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ─── Videogames SECTION ──────────────────────────────────────────────────
+function VideogamesSection() {
+  const {
+    data: videojuegos,
+    loading,
+    error,
+    refresh,
+  } = useFetch((signal) => videojuegoService.list(signal), []);
+
+  const [tab, setTab] = useState("add");
+  const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    mutate(async () => {
+      await videojuegoService.create({ nombre: trimmed });
+      setName("");
+      refresh();
+    });
+  };
+
+  const handleSaveEdit = (id: number) => {
+    mutate(async () => {
+      await videojuegoService.update(id, { nombre: editName.trim() });
+      setEditingId(null);
+      refresh();
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    mutate(async () => {
+      await videojuegoService.remove(id);
+      refresh();
+    });
+  };
+
+  return (
+    <>
+      <SubTabs
+        tabs={[
+          { key: "add", label: "Agregar" },
+          { key: "manage", label: "Administrar" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {mutationError && (
+        <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
+      )}
+
+      {tab === "add" && (
+        <form onSubmit={handleAdd} className="space-y-3">
+          <div className="space-y-1">
+            <Label className="text-sm">Nombre *</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Minecraft"
+              required
+              disabled={mutating}
+            />
+          </div>
+          <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
+            <Plus className="w-4 h-4 mr-1" />
+            {mutating ? "Guardando…" : "Agregar Videojuego"}
+          </Button>
+        </form>
+      )}
+
+      {tab === "manage" && (
+        <div className="space-y-2">
+          {loading ? (
+            <p className="text-center py-6 text-muted-foreground">Cargando videojuegos…</p>
+          ) : error ? (
+            <p className="text-center py-6 text-destructive">
+              No se pudieron cargar los videojuegos: {error.message}
+            </p>
+          ) : !videojuegos || videojuegos.length === 0 ? (
+            <p className="text-center py-6 text-muted-foreground">No hay videojuegos configurados</p>
+          ) : (
+              videojuegos.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30"
+              >
+                <span className="text-xl flex-shrink-0">🏳️</span>
+                {editingId === c.id ? (
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="h-8 flex-1"
+                    placeholder="Nombre"
+                    disabled={mutating}
+                  />
                 ) : (
                   <div className="flex-1">
                     <span>{c.nombre}</span>
                   </div>
                 )}
-                <Badge variant="outline" className="text-xs">#{c.id}</Badge>
                 <div className="flex items-center gap-1">
                   {editingId === c.id ? (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => paisesService.update(c.id, { nombre: editName.trim() }), () => setEditingId(null))} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleSaveEdit(c.id)}
+                        disabled={mutating}
+                      >
+                        <Check className="w-4 h-4 text-accent" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingId(null)}
+                        disabled={mutating}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(c.id); setEditName(c.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => paisesService.remove(c.id))} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingId(c.id);
+                          setEditName(c.nombre);
+                        }}
+                        disabled={mutating}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleDelete(c.id)}
+                        disabled={mutating}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
                     </>
                   )}
                 </div>
@@ -567,51 +992,72 @@ function CountriesSection({
 }
 
 // ─── PAYMENT METHODS SECTION ────────────────────────────────────────────
-// Wired to backend Metodo_Pago via metodosPagoService. The backend model
-// stores only { id, nombre } — value/description/countryCode aren't
-// persisted, so the per-country grouping from the mock store is dropped here.
-function PaymentMethodsSection({
-  metodos,
-  loading,
-  error,
-  refresh,
-}: {
-  metodos: MetodoPago[] | null;
-  loading: boolean;
-  error: { message: string } | null;
-  refresh: () => void;
-}) {
+function PaymentMethodsSection() {
+  const {
+    data: metodos,
+    loading,
+    error,
+    refresh,
+  } = useFetch((signal) => metodosPagoService.list(signal), []);
+
+  const { data: paises, loading: paisesLoading } = useFetch(
+      (signal) => paisesService.list(signal),
+      [],
+  );
+
   const [tab, setTab] = useState("add");
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [paisId, setPaisId] = useState("");
+  // TODO: country association when backend supports it
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
-  const [mutating, setMutating] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
-
-  const runMutation = async (op: () => Promise<unknown>, after?: () => void) => {
-    setMutating(true);
-    setMutationError(null);
-    try {
-      await op();
-      after?.();
-      refresh();
-    } catch (err) {
-      setMutationError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setMutating(false);
-    }
-  };
+  const [editDesc, setEditDesc] = useState("");
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    runMutation(() => metodosPagoService.create({ nombre: trimmed }), () => setName(""));
+    mutate(async () => {
+      await metodosPagoService.create(
+          {
+            nombre: trimmed,
+            id_pais: Number(paisId),
+          });
+      setName("");
+      setDescription("");
+      setPaisId("");
+      refresh();
+    });
+  };
+
+  const handleSaveEdit = (id: number) => {
+    mutate(async () => {
+      // TODO: include description when backend supports it
+      await metodosPagoService.update(id, { nombre: editName.trim() });
+      setEditingId(null);
+      refresh();
+    });
+  };
+
+  const handleDelete = (id: number) => {
+    mutate(async () => {
+      await metodosPagoService.remove(id);
+      refresh();
+    });
   };
 
   return (
     <>
-      <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
+      <SubTabs
+        tabs={[
+          { key: "add", label: "Agregar" },
+          { key: "manage", label: "Administrar" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {mutationError && (
         <p className="mb-3 text-sm text-destructive">Error: {mutationError}</p>
@@ -621,12 +1067,37 @@ function PaymentMethodsSection({
         <form onSubmit={handleAdd} className="space-y-3">
           <div className="space-y-1">
             <Label className="text-sm">Nombre *</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej: Nequi" required disabled={mutating} />
-            <p className="text-xs text-muted-foreground">El backend solo persiste el nombre.</p>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="ej: Nequi"
+              required
+              disabled={mutating}
+            />
+          </div>
+          <div className="space-y-1">
+            <select
+                value={paisId}
+                onChange={(e) => setPaisId(e.target.value)}
+                required
+                disabled={paisesLoading || mutating}
+                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">
+                {paisesLoading ? "Cargando países…" : "Selecciona un país"}
+              </option>
+              {(paises ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}
+                  </option>
+              ))}
+            </select>
           </div>
           <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={mutating}>
-            <Plus className="w-4 h-4 mr-1" /> {mutating ? "Guardando…" : "Agregar Método"}
+            <Plus className="w-4 h-4 mr-1" />
+            {mutating ? "Guardando…" : "Agregar Método"}
           </Button>
+          {/*comentarioN*/}
         </form>
       )}
 
@@ -642,24 +1113,77 @@ function PaymentMethodsSection({
             <p className="text-center py-6 text-muted-foreground">No hay métodos de pago</p>
           ) : (
             metodos.map((m) => (
-              <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30">
+              <div
+                key={m.id}
+                className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30"
+              >
                 <Wallet className="w-4 h-4 text-primary flex-shrink-0" />
                 {editingId === m.id ? (
-                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 flex-1" disabled={mutating} />
+                  <div className="flex-1 flex gap-2">
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="h-8 flex-1"
+                      disabled={mutating}
+                    />
+                    <Input
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      className="h-8 flex-1"
+                      disabled={mutating}
+                    />
+                  </div>
                 ) : (
-                  <p className="flex-1 min-w-0 truncate">{m.nombre}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate">{m.nombre}</p>
+                  </div>
                 )}
-                <Badge variant="outline" className="text-xs">#{m.id}</Badge>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {editingId === m.id ? (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => metodosPagoService.update(m.id, { nombre: editName.trim() }), () => setEditingId(null))} disabled={mutating}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)} disabled={mutating}><X className="w-4 h-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleSaveEdit(m.id)}
+                        disabled={mutating}
+                      >
+                        <Check className="w-4 h-4 text-accent" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setEditingId(null)}
+                        disabled={mutating}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(m.id); setEditName(m.nombre); }} disabled={mutating}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => runMutation(() => metodosPagoService.remove(m.id))} disabled={mutating}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditingId(m.id);
+                          setEditName(m.nombre);
+                          setEditDesc(""); // TODO: real description
+                        }}
+                        disabled={mutating}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => handleDelete(m.id)}
+                        disabled={mutating}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                      </Button>
                     </>
                   )}
                 </div>
@@ -674,105 +1198,190 @@ function PaymentMethodsSection({
 
 // ─── OFFERS SECTION ─────────────────────────────────────────────────────
 function OffersSection() {
-  const store = useStore();
+  const { data: productos, loading: productosLoading } = useFetch(
+    (signal) => productosService.list(signal),
+    [],
+  );
+
   const [tab, setTab] = useState("add");
-  const [gameId, setGameId] = useState("");
+  const [productoId, setProductoId] = useState("");
   const [discount, setDiscount] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDiscount, setEditDiscount] = useState("");
-  const [editStart, setEditStart] = useState("");
-  const [editEnd, setEditEnd] = useState("");
+
+  // TODO: Replace with real backend offers when /api/ofertas exists
+  type LocalOffer = {
+    id: string;
+    productoId: string;
+    discountPercent: number;
+    startDate: string;
+    endDate: string;
+    active: boolean;
+    archived: boolean;
+  };
+  const [offers, setOffers] = useState<LocalOffer[]>([]);
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (gameId && discount) {
-      store.addOffer({
-        gameId,
-        discountPercent: parseFloat(discount),
-        startDate: startDate || new Date().toISOString().split("T")[0],
-        endDate: endDate || "2099-12-31",
-        active: true,
-      });
-      setGameId(""); setDiscount(""); setStartDate(""); setEndDate("");
+    if (productoId && discount) {
+      setOffers((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          productoId,
+          discountPercent: parseFloat(discount),
+          startDate: startDate || new Date().toISOString().split("T")[0],
+          endDate: endDate || "2099-12-31",
+          active: true,
+          archived: false,
+        },
+      ]);
+      setProductoId("");
+      setDiscount("");
+      setStartDate("");
+      setEndDate("");
     }
   };
 
-  const getGameTitle = (id: string) => store.games.find((g) => g.id === id)?.title || "Desconocido";
+  const getProductoNombre = (id: string) =>
+    productos?.find((p) => String(p.id) === id)?.nombre ?? "Desconocido";
 
   return (
     <>
-      <SubTabs tabs={[{ key: "add", label: "Agregar" }, { key: "manage", label: "Administrar" }]} active={tab} onChange={setTab} />
+      <SubTabs
+        tabs={[
+          { key: "add", label: "Agregar" },
+          { key: "manage", label: "Administrar" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
       {tab === "add" && (
         <form onSubmit={handleAdd} className="space-y-3">
           <div className="space-y-1">
             <Label className="text-sm">Producto *</Label>
-            <select value={gameId} onChange={(e) => setGameId(e.target.value)} required className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <option value="">Selecciona un juego</option>
-              {store.getActiveGames().map((g) => (
-                <option key={g.id} value={g.id}>{g.title}</option>
+            <select
+              value={productoId}
+              onChange={(e) => setProductoId(e.target.value)}
+              required
+              disabled={productosLoading}
+              className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">
+                {productosLoading ? "Cargando productos…" : "Selecciona un producto"}
+              </option>
+              {(productos ?? []).map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.nombre}
+                </option>
               ))}
             </select>
           </div>
           <div className="space-y-1">
             <Label className="text-sm">Descuento (%) *</Label>
-            <Input type="number" min="1" max="99" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="20" required />
+            <Input
+              type="number"
+              min="1"
+              max="99"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+              placeholder="20"
+              required
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-sm">Fecha inicio</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-sm">Fecha fin</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
           </div>
-          <Button type="submit" className="bg-primary hover:bg-primary/90"><Plus className="w-4 h-4 mr-1" /> Agregar Oferta</Button>
+          <p className="text-xs text-muted-foreground">
+            TODO: Conectar con endpoint /api/ofertas cuando esté disponible
+          </p>
+          <Button type="submit" className="bg-primary hover:bg-primary/90">
+            <Plus className="w-4 h-4 mr-1" /> Agregar Oferta
+          </Button>
         </form>
       )}
 
       {tab === "manage" && (
         <div className="space-y-2">
-          {store.offers.length === 0 ? (
+          {offers.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground">No hay ofertas</p>
           ) : (
-            store.offers.map((o) => (
-              <div key={o.id} className={`flex items-center gap-3 p-3 rounded-lg border ${o.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"}`}>
+            offers.map((o) => (
+              <div
+                key={o.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  o.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"
+                }`}
+              >
                 <Percent className="w-4 h-4 text-accent flex-shrink-0" />
-                {editingId === o.id ? (
-                  <div className="flex-1 flex flex-wrap gap-2">
-                    <Input type="number" min="1" max="99" value={editDiscount} onChange={(e) => setEditDiscount(e.target.value)} className="h-8 w-20" placeholder="%" />
-                    <Input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} className="h-8 flex-1" />
-                    <Input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)} className="h-8 flex-1" />
-                  </div>
-                ) : (
-                  <div className="flex-1 min-w-0">
-                    <p className={`truncate ${o.archived ? "line-through text-muted-foreground" : ""}`}>
-                      {getGameTitle(o.gameId)} — <span className="text-accent">{o.discountPercent}% OFF</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{o.startDate} → {o.endDate}</p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={`truncate ${
+                      o.archived ? "line-through text-muted-foreground" : ""
+                    }`}
+                  >
+                    {getProductoNombre(o.productoId)} —{" "}
+                    <span className="text-accent">{o.discountPercent}% OFF</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.startDate} → {o.endDate}
+                  </p>
+                </div>
+                {o.archived && (
+                  <Badge variant="secondary" className="text-xs">
+                    Archivado
+                  </Badge>
                 )}
-                {o.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
-                {!o.active && !o.archived && <Badge variant="outline" className="text-xs">Inactivo</Badge>}
+                {!o.active && !o.archived && (
+                  <Badge variant="outline" className="text-xs">
+                    Inactivo
+                  </Badge>
+                )}
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {editingId === o.id ? (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { store.updateOffer(o.id, { discountPercent: parseFloat(editDiscount), startDate: editStart, endDate: editEnd }); setEditingId(null); }}><Check className="w-4 h-4 text-accent" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingId(null)}><X className="w-4 h-4" /></Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingId(o.id); setEditDiscount(String(o.discountPercent)); setEditStart(o.startDate); setEditEnd(o.endDate); }}><Pencil className="w-3.5 h-3.5" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.archiveOffer(o.id)}>
-                        {o.archived ? <ArchiveRestore className="w-3.5 h-3.5 text-accent" /> : <Archive className="w-3.5 h-3.5 text-muted-foreground" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => store.deleteOffer(o.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
-                    </>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() =>
+                      setOffers((prev) =>
+                        prev.map((x) =>
+                          x.id === o.id ? { ...x, archived: !x.archived } : x,
+                        ),
+                      )
+                    }
+                  >
+                    {o.archived ? (
+                      <ArchiveRestore className="w-3.5 h-3.5 text-accent" />
+                    ) : (
+                      <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() =>
+                      setOffers((prev) => prev.filter((x) => x.id !== o.id))
+                    }
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </Button>
                 </div>
               </div>
             ))
@@ -783,54 +1392,37 @@ function OffersSection() {
   );
 }
 
-// ─── Mock user pool for seller search ───────────────────────────────────
-const MOCK_USER_POOL = [
-  { username: "alpha_games", displayName: "Alpha Games", avatar: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=80&h=80&fit=crop" },
-  { username: "retro_master", displayName: "Retro Master", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop" },
-  { username: "gamer_vault", displayName: "Gamer Vault", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop" },
-  { username: "indie_studio", displayName: "Indie Studio", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop" },
-  { username: "console_king", displayName: "Console King", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&h=80&fit=crop" },
-  { username: "pixelcraft", displayName: "PixelCraft Store", avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=80&h=80&fit=crop" },
-  { username: "stealth_games", displayName: "Stealth Games", avatar: "https://images.unsplash.com/photo-1463453091185-61582044d556?w=80&h=80&fit=crop" },
-  { username: "vrgaming", displayName: "VR Gaming Hub", avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=80&h=80&fit=crop" },
-];
-
 // ─── SELLERS SECTION ────────────────────────────────────────────────────
 function SellersSection() {
-  const store = useStore();
+  const {
+    data: usuarios,
+    loading,
+    error,
+  } = useFetch((signal) => usuariosService.list(signal), []);
+
   const [tab, setTab] = useState("manage");
   const [searchQuery, setSearchQuery] = useState("");
   const [sellerSearch, setSellerSearch] = useState("");
+  // TODO: Replace with real vendedores endpoint when available
+  const [sellerIds, setSellerIds] = useState<number[]>([]);
 
-  // Search users to add
-  const filteredPool = MOCK_USER_POOL.filter(
+  const sellers: Usuario[] = (usuarios ?? []).filter((u) => sellerIds.includes(u.id));
+  const pool: Usuario[] = (usuarios ?? []).filter((u) => !sellerIds.includes(u.id));
+
+  const filteredPool = pool.filter(
     (u) =>
-      !store.sellers.some((s) => s.username === u.username) &&
-      (u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.displayName.toLowerCase().includes(searchQuery.toLowerCase()))
+      u.usuario.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.nombre.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const handleAddSeller = (user: (typeof MOCK_USER_POOL)[0]) => {
-    store.addSeller({
-      username: user.username,
-      displayName: user.displayName,
-      avatar: user.avatar,
-      rating: 0,
-      reviewCount: 0,
-      joinedDate: new Date().toISOString().split("T")[0],
-    });
-  };
-
-  // Manage list filtering
-  const filteredSellers = store.sellers.filter(
+  const filteredSellers = sellers.filter(
     (s) =>
-      s.username.toLowerCase().includes(sellerSearch.toLowerCase()) ||
-      s.displayName.toLowerCase().includes(sellerSearch.toLowerCase())
+      s.usuario.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+      s.nombre.toLowerCase().includes(sellerSearch.toLowerCase()),
   );
 
-  // Count products per seller
-  const getProductCount = (sellerId: string) =>
-    store.games.filter((g) => g.sellerId === sellerId && !g.archived).length;
+  const getProductCount = (vendedorId: number) =>
+    0; // TODO: real count when backend supports it
 
   return (
     <>
@@ -843,66 +1435,72 @@ function SellersSection() {
         onChange={setTab}
       />
 
-      {/* ── ADD tab: search user pool ── */}
       {tab === "add" && (
         <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar usuario por username o nombre..."
-              className="pl-9"
-            />
-          </div>
-
-          {searchQuery.trim() === "" ? (
-            <p className="text-center py-6 text-muted-foreground text-sm">
-              Escribe un username para buscar usuarios disponibles
-            </p>
-          ) : filteredPool.length === 0 ? (
-            <p className="text-center py-6 text-muted-foreground text-sm">
-              No se encontraron usuarios con ese nombre, o ya son vendedores
+          {loading ? (
+            <div className="flex items-center justify-center py-6 text-muted-foreground">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Cargando usuarios…
+            </div>
+          ) : error ? (
+            <p className="text-center py-6 text-destructive">
+              No se pudieron cargar los usuarios: {error.message}
             </p>
           ) : (
-            <div className="space-y-2">
-              {filteredPool.map((user) => (
-                <div
-                  key={user.username}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
-                >
-                  <img
-                    src={user.avatar}
-                    alt={user.displayName}
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        "https://ui-avatars.com/api/?name=" + encodeURIComponent(user.displayName);
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{user.displayName}</p>
-                    <p className="text-xs text-muted-foreground">@{user.username}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleAddSeller(user)}
-                    className="bg-primary hover:bg-primary/90 flex-shrink-0"
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Agregar
-                  </Button>
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar usuario por username o nombre..."
+                  className="pl-9"
+                />
+              </div>
+
+              {searchQuery.trim() === "" ? (
+                <p className="text-center py-6 text-muted-foreground text-sm">
+                  Escribe un username para buscar usuarios disponibles
+                </p>
+              ) : filteredPool.length === 0 ? (
+                <p className="text-center py-6 text-muted-foreground text-sm">
+                  No se encontraron usuarios con ese nombre, o ya son vendedores
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {filteredPool.map((u) => (
+                    <div
+                      key={u.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
+                    >
+                      <img
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nombre)}&size=40`}
+                        alt={u.nombre}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate">{u.nombre}</p>
+                        <p className="text-xs text-muted-foreground">@{u.usuario}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setSellerIds((prev) => [...prev, u.id])}
+                        className="bg-primary hover:bg-primary/90 flex-shrink-0"
+                      >
+                        <UserPlus className="w-4 h-4 mr-1" />
+                        Agregar
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
 
-      {/* ── MANAGE tab: sellers list with search + scroll ── */}
       {tab === "manage" && (
         <div className="space-y-3">
-          {/* Search bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -915,87 +1513,64 @@ function SellersSection() {
 
           {filteredSellers.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground text-sm">
-              {store.sellers.length === 0
+              {sellers.length === 0
                 ? "No hay vendedores registrados. Usa «Agregar» para añadir uno."
                 : "No se encontraron vendedores con ese nombre."}
             </p>
           ) : (
-            /* Scrollable list — max ~12 items visible (~72px each = ~864px) */
             <div className="max-h-[864px] overflow-y-auto space-y-2 pr-1">
-              {filteredSellers.map((s) => {
-                const productCount = getProductCount(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                      s.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"
-                    }`}
-                  >
-                    <img
-                      src={s.avatar}
-                      alt={s.displayName}
-                      className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://ui-avatars.com/api/?name=" + encodeURIComponent(s.displayName) + "&size=48";
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className={`truncate ${s.archived ? "line-through text-muted-foreground" : ""}`}>
-                          {s.displayName}
-                        </p>
-                        {s.archived && <Badge variant="secondary" className="text-xs">Archivado</Badge>}
-                      </div>
-                      <p className="text-xs text-muted-foreground">@{s.username}</p>
-                      <div className="flex items-center gap-3 mt-1 flex-wrap">
-                        {s.rating > 0 ? (
-                          <StarRatingDisplay rating={s.rating} />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sin calificaciones aún</span>
-                        )}
-                        {s.reviewCount > 0 && (
-                          <span className="text-xs text-muted-foreground">({s.reviewCount} reseñas)</span>
-                        )}
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Package className="w-3 h-3" />
-                          {productCount} {productCount === 1 ? "producto" : "productos"}
-                        </span>
-                      </div>
+              {filteredSellers.map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
+                >
+                  <img
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(s.nombre)}&size=48`}
+                    alt={s.nombre}
+                    className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="truncate">{s.nombre}</p>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => store.archiveSeller(s.id)}
-                        title={s.archived ? "Restaurar" : "Archivar"}
-                      >
-                        {s.archived ? (
-                          <ArchiveRestore className="w-3.5 h-3.5 text-accent" />
-                        ) : (
-                          <Archive className="w-3.5 h-3.5 text-muted-foreground" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => store.deleteSeller(s.id)}
-                        title="Eliminar vendedor"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                      </Button>
+                    <p className="text-xs text-muted-foreground">@{s.usuario}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {/* TODO: real rating from backend */}
+                      <span className="text-xs text-muted-foreground">
+                        Sin calificaciones aún
+                      </span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Package className="w-3 h-3" />
+                        {getProductCount(s.id)} productos
+                      </span>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        setSellerIds((prev) => prev.filter((id) => id !== s.id))
+                      }
+                      title="Quitar como vendedor"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
           <p className="text-xs text-muted-foreground text-center pt-1">
-            {filteredSellers.length} {filteredSellers.length === 1 ? "vendedor" : "vendedores"}
-            {store.sellers.length !== filteredSellers.length && ` de ${store.sellers.length}`}
+            {filteredSellers.length}{" "}
+            {filteredSellers.length === 1 ? "vendedor" : "vendedores"}
+            {sellers.length !== filteredSellers.length &&
+              ` de ${sellers.length}`}
+          </p>
+          <p className="text-xs text-muted-foreground text-center">
+            TODO: Conectar con endpoint de vendedores cuando esté disponible
           </p>
         </div>
       )}
@@ -1005,54 +1580,60 @@ function SellersSection() {
 
 // ─── MAIN ADMIN PANEL ───────────────────────────────────────────────────
 export function AdminPanel() {
-  // Live Producto count from backend, surfaced in the Productos card header.
-  const { data: backendProductos, loading: backendProductosLoading, error: backendProductosError } =
-    useFetch(() => productosService.list(), []);
+  const {
+    data: backendProductos,
+    loading: backendProductosLoading,
+    error: backendProductosError,
+  } = useFetch((signal) => productosService.list(signal), []);
   const productosSubtitle = backendProductosLoading
     ? "Cargando productos del backend…"
     : backendProductosError
-    ? `Error: ${backendProductosError.message}`
-    : "Agregar y administrar videojuegos del catálogo";
+      ? `Error: ${backendProductosError.message}`
+      : "Agregar y administrar videojuegos del catálogo";
 
-  // Live Categorias from the backend, shared with the CategoriesSection so a
-  // single source of truth drives both the card header and the manage list.
   const {
     data: backendCategorias,
     loading: backendCategoriasLoading,
     error: backendCategoriasError,
-    refresh: refreshCategorias,
-  } = useFetch(() => categoriasService.list(), []);
+  } = useFetch((signal) => categoriasService.list(signal), []);
   const categoriasSubtitle = backendCategoriasLoading
     ? "Cargando categorías del backend…"
     : backendCategoriasError
-    ? `Error: ${backendCategoriasError.message}`
-    : "Organiza los productos por género o tipo";
+      ? `Error: ${backendCategoriasError.message}`
+      : "Organiza los productos por género o tipo";
 
-  // Live Pais list from the backend, shared with CountriesSection.
   const {
     data: backendPaises,
     loading: backendPaisesLoading,
     error: backendPaisesError,
-    refresh: refreshPaises,
-  } = useFetch(() => paisesService.list(), []);
+  } = useFetch((signal) => paisesService.list(signal), []);
   const paisesSubtitle = backendPaisesLoading
     ? "Cargando países del backend…"
     : backendPaisesError
-    ? `Error: ${backendPaisesError.message}`
-    : "Configura los países disponibles y sus monedas";
+      ? `Error: ${backendPaisesError.message}`
+      : "Configura los países disponibles y sus monedas";
 
-  // Live Metodo_Pago list from the backend, shared with PaymentMethodsSection.
+  const {
+    data: backendVideojuegos,
+    loading: backendVideojuegosLoading,
+    error: backendVideojuegosError,
+  } = useFetch((signal) => videojuegoService.list(signal), []);
+  const videojuegosSubtitle = backendVideojuegosLoading
+    ? "Cargando videojuegos del backend…"
+    : backendVideojuegosError
+      ? `Error: ${backendVideojuegosError.message}`
+      : "Configura los videojuegos disponibles";
+
   const {
     data: backendMetodos,
     loading: backendMetodosLoading,
     error: backendMetodosError,
-    refresh: refreshMetodos,
-  } = useFetch(() => metodosPagoService.list(), []);
+  } = useFetch((signal) => metodosPagoService.list(signal), []);
   const metodosSubtitle = backendMetodosLoading
     ? "Cargando métodos del backend…"
     : backendMetodosError
-    ? `Error: ${backendMetodosError.message}`
-    : "Gestiona las opciones de pago por país";
+      ? `Error: ${backendMetodosError.message}`
+      : "Gestiona las opciones de pago por país";
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
@@ -1073,7 +1654,7 @@ export function AdminPanel() {
             subtitle={productosSubtitle}
             defaultOpen={true}
             accentColor="bg-primary/10 text-primary"
-            count={backendProductos?.length ?? null}
+            count={backendProductos?.length ?? undefined}
             countLabel="en backend"
           >
             <ProductsSection />
@@ -1088,29 +1669,24 @@ export function AdminPanel() {
             <SellersSection />
           </AdminExpandableCard>
 
-          <AdminExpandableCard
+          {/* <AdminExpandableCard
             icon={<Percent className="w-5 h-5" />}
             title="Ofertas"
             subtitle="Crear y gestionar descuentos en productos"
             accentColor="bg-accent/10 text-accent"
           >
             <OffersSection />
-          </AdminExpandableCard>
+          </AdminExpandableCard> */}
 
           <AdminExpandableCard
             icon={<Tag className="w-5 h-5" />}
             title="Categorías"
             subtitle={categoriasSubtitle}
             accentColor="bg-secondary/10 text-secondary"
-            count={backendCategorias?.length ?? null}
+            count={backendCategorias?.length ?? undefined}
             countLabel="en backend"
           >
-            <CategoriesSection
-              categorias={backendCategorias}
-              loading={backendCategoriasLoading}
-              error={backendCategoriasError}
-              refresh={refreshCategorias}
-            />
+            <CategoriesSection />
           </AdminExpandableCard>
 
           <AdminExpandableCard
@@ -1118,31 +1694,35 @@ export function AdminPanel() {
             title="Países y Monedas"
             subtitle={paisesSubtitle}
             accentColor="bg-amber-500/10 text-amber-600"
-            count={backendPaises?.length}
+            count={backendPaises?.length ?? undefined}
             countLabel="países"
           >
-            <CountriesSection
-              paises={backendPaises}
-              loading={backendPaisesLoading}
-              error={backendPaisesError}
-              refresh={refreshPaises}
-            />
+            <CountriesSection />
+
           </AdminExpandableCard>
+
+          <AdminExpandableCard
+              icon={<Globe className="w-5 h-5" />}
+              title="Videojuegos"
+              subtitle={videojuegosSubtitle}
+              accentColor="bg-amber-500/10 text-amber-600"
+              count={backendVideojuegos?.length ?? undefined}
+              countLabel="videojuegos"
+          >
+            <VideogamesSection />
+
+          </AdminExpandableCard>
+
 
           <AdminExpandableCard
             icon={<Wallet className="w-5 h-5" />}
             title="Métodos de Pago"
             subtitle={metodosSubtitle}
             accentColor="bg-emerald-500/10 text-emerald-600"
-            count={backendMetodos?.length}
+            count={backendMetodos?.length ?? undefined}
             countLabel="métodos"
           >
-            <PaymentMethodsSection
-              metodos={backendMetodos}
-              loading={backendMetodosLoading}
-              error={backendMetodosError}
-              refresh={refreshMetodos}
-            />
+            <PaymentMethodsSection />
           </AdminExpandableCard>
         </div>
 

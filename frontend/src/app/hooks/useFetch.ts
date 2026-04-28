@@ -8,7 +8,9 @@ export interface FetchState<T> {
 }
 
 // Generic data-fetching hook for use with the resource services.
-// Usage: const { data, loading, error } = useFetch(() => productosService.list(), []);
+// The fetcher receives an AbortSignal so in-flight requests are cancelled
+// when the component unmounts or deps change.
+// Usage: const { data, loading, error } = useFetch((signal) => productosService.list(signal), []);
 export function useFetch<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   deps: ReadonlyArray<unknown> = [],
