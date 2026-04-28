@@ -29,6 +29,8 @@ export async function request<T = unknown>(
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
+  console.log("RESPONSE:", text);
+  return JSON.parse(text);
   const data = text ? JSON.parse(text) : null;
 
   if (!res.ok) {
