@@ -58,3 +58,5 @@ export const http = {
   del: <T>(path: string) =>
     request<T>(path, { method: "DELETE" }),
 };
+
+console.log(import.meta.env.VITE_API_URL);
