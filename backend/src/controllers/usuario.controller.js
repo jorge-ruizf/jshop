@@ -27,7 +27,8 @@ export async function getUsuario(req, res, next) {
 export async function createUsuario(req, res, next) {
   try {
     const { nombre, usuario, correo, id_pais, id_rol, id_metodo_pago_fav, ventas } = req.body;
-    res.status(201).json(await prisma.usuario.create({
+
+    const nuevo = await prisma.usuario.create({
       data: {
         nombre,
         usuario,
@@ -37,8 +38,27 @@ export async function createUsuario(req, res, next) {
         id_metodo_pago_fav,
         ventas: ventas ?? 0,
       },
-    }));
-  } catch (err) { next(err); }
+    });
+
+    res.status(201).json(nuevo);
+
+  } catch (err) {
+    // 🔥 AQUÍ manejas el error UNIQUE
+    if (err.code === "P2002") {
+      try {
+        // 👇 ya existe → lo buscamos y lo devolvemos
+        const existente = await prisma.usuario.findUnique({
+          where: { correo: req.body.correo },
+        });
+
+        return res.status(200).json(existente);
+      } catch (e) {
+        return next(e);
+      }
+    }
+
+    next(err);
+  }
 }
 
 export async function updateUsuario(req, res, next) {

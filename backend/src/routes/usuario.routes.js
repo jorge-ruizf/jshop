@@ -14,6 +14,18 @@ usuarioRouter.post(
 );
 usuarioRouter.put('/:id', parseId, updateUsuario);
 usuarioRouter.delete('/:id', parseId, deleteUsuario);
-usuarioRouter.get('/by-email', getUsuarioByCorreo);
+usuarioRouter.get('/by-email', async (req, res, next) => {
+    try {
+        const { correo } = req.query;
+
+        const usuario = await prisma.usuario.findUnique({
+            where: { correo },
+        });
+
+        res.json(usuario ?? null);
+    } catch (err) {
+        next(err);
+    }
+});
 
 export { usuarioRouter };
