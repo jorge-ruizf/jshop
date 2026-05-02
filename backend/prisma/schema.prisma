@@ -86,7 +86,7 @@ model Usuario {
   nombre             String @db.VarChar(100)
   usuario            String @db.VarChar(50)
   ventas             Int    // int(20) — contador de ventas realizadas
-  correo             String @db.VarChar(200)
+  correo             String @db.VarChar(200) @unique
   id_pais            Int
   id_rol             Int
   id_metodo_pago_fav Int

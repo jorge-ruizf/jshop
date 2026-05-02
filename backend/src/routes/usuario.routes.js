@@ -1,8 +1,7 @@
 import { Router } from 'express';
 import { requireFields, parseId } from '../middlewares/validateBody.js';
-import {
-  listUsuarios, getUsuario, createUsuario, updateUsuario, deleteUsuario,
-} from '../controllers/usuario.controller.js';
+import { listUsuarios, getUsuario, createUsuario, updateUsuario, deleteUsuario, } from '../controllers/usuario.controller.js';
+import { getUsuarioByCorreo } from '../controllers/usuario.controller.js';
 
 const usuarioRouter = Router();
 
@@ -15,5 +14,6 @@ usuarioRouter.post(
 );
 usuarioRouter.put('/:id', parseId, updateUsuario);
 usuarioRouter.delete('/:id', parseId, deleteUsuario);
+usuarioRouter.get('/by-email', getUsuarioByCorreo);
 
 export { usuarioRouter };

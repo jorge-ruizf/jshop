@@ -65,3 +65,26 @@ export async function deleteUsuario(req, res, next) {
     res.status(204).end();
   } catch (err) { next(err); }
 }
+
+export async function getUsuarioByCorreo(req, res, next) {
+  try {
+    const { correo } = req.query;
+
+    if (!correo) {
+      return res.status(400).json({ error: { message: "correo es requerido" } });
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { correo },
+      include: { pais: true, rol: true, metodo_pago_fav: true },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ error: { message: "Usuario not found" } });
+    }
+
+    res.json(usuario);
+  } catch (err) {
+    next(err);
+  }
+}

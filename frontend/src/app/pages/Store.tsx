@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
-import { useFetch } from "../hooks";
+import { useFetch } from "../hooks";  
 import { productosService, categoriasService } from "../services";
 import type { Seller } from "../data/games";
 
