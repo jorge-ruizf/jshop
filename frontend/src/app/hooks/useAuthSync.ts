@@ -20,17 +20,13 @@ export function useAuthSync() {
       const email = user.email!;
       const fullName = user.user_metadata?.full_name || "";
 
-      try {
-        // 🔍 buscar usuario en tu DB
-        const existing = await usuariosService.getByEmail(email);
+      const existing = await usuariosService.getByEmail(email);
 
-        if (existing) {
-          setUsuario(existing);
-        } else {
-          throw new Error("No existe");
-        }
-      } catch {
-        // 🆕 crear usuario si no existe
+      console.log("Frontend=> existing:", existing);
+
+      if (existing) {
+        setUsuario(existing);
+      } else {
         const username = email.split("@")[0];
 
         const nuevo = await usuariosService.create({
@@ -45,6 +41,7 @@ export function useAuthSync() {
         setUsuario(nuevo);
       }
 
+
       setLoading(false);
     };
 
@@ -58,5 +55,5 @@ export function useAuthSync() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  return { usuario, loading };
+  return { usuario, setUsuario, loading };
 }

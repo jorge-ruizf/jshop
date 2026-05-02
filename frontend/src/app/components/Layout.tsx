@@ -8,7 +8,7 @@ import { Separator } from "./ui/separator";
 import { useState, useEffect } from "react";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks/useFetch";
-import { productosService, paisesService, Usuario} from "../services";
+import {productosService, paisesService, Usuario, usuariosService} from "../services";
 import {useAuthSync} from "../hooks/useAuthSync";
 
 export function Layout() {
@@ -30,7 +30,7 @@ export function Layout() {
     error: paisesError,
   } = useFetch(() => paisesService.list(), []);
 
-  const {usuario, loading} = useAuthSync();
+  const { usuario, setUsuario } = useAuthSync();
 
   const [userProfile, setUserProfile] = useState({
     name: "",
@@ -59,6 +59,26 @@ export function Layout() {
 
   const toggleEditMode = (field: "name" | "discord") => {
     setEditMode({...editMode, [field]: !editMode[field]});
+  };
+
+  const handleSaveName = async () => {
+    if (!usuario) return;
+    if (userProfile.name === usuario.nombre) return;
+
+    try {
+      await usuariosService.update(usuario.id, {
+        nombre: userProfile.name,
+      });
+
+      // 🔥 sync sin recargar
+      setUsuario((prev) => prev && {
+        ...prev,
+        nombre: userProfile.name,
+      });
+
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -146,7 +166,10 @@ export function Layout() {
                                 id="name"
                                 value={userProfile.name}
                                 onChange={(e) => setUserProfile({...userProfile, name: e.target.value})}
-                                onBlur={() => toggleEditMode("name")}
+                                onBlur={async () => {
+                                  toggleEditMode("name");
+                                  await handleSaveName();
+                                }}
                                 autoFocus
                                 className="h-8"
                             />
