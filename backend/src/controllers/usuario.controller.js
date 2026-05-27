@@ -94,9 +94,13 @@ export async function getUsuarioByCorreo(req, res, next) {
       return res.status(400).json({ error: { message: "correo es requerido" } });
     }
 
-    const usuario = await prisma.usuario.findUnique({
+    const usuario = await prisma.usuario.findFirst({
       where: { correo },
-      include: { pais: true, rol: true, metodo_pago_fav: true },
+      include: {
+        pais: true,
+        rol: true,
+        metodo_pago_fav: true
+      },
     });
 
     if (!usuario) {
