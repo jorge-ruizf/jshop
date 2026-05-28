@@ -30,9 +30,7 @@ export async function request<T = unknown>(
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
-  console.log("RESPONSE:", text);
-  return JSON.parse(text);
-  const data = text ? JSON.parse(text) : null;
+  const data = text ? JSON.parse(text) : null;  // ← movido antes del return
 
   if (!res.ok) {
     const msg =
@@ -43,7 +41,7 @@ export async function request<T = unknown>(
     throw new ApiError(msg, res.status, data);
   }
 
-  return data as T;
+  return data as T;  // ← return al final
 }
 
 export const http = {
@@ -60,4 +58,4 @@ export const http = {
     request<T>(path, { method: "DELETE" }),
 };
 
-console.log(import.meta.env.VITE_API_URL);
+//console.log(import.meta.env.VITE_API_URL);
