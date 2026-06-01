@@ -170,7 +170,7 @@ function ProductsSection() {
         descripcion: description.trim(),
         id_categoria: Number(categoryId),
         id_pais: Number(paisId),
-        id_videojuego: Number(videojuegoId),
+        //id_videojuego: Number(videojuegoId),
         id_vendedor: Number(vendedorId) || 0,
       });
       resetForm();

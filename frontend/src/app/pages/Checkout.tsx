@@ -7,27 +7,34 @@ import { Badge } from "../components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Separator } from "../components/ui/separator";
 import { Wallet, Trash2, ArrowLeft, Minus, Package, Infinity, Loader2 } from "lucide-react";
+import { paisesService, metodosPagoService } from "../services";
+import { useAuthContext } from "../contexts/AuthContext";
+import { carritoService } from "../services/carrito.service";
 import { useFetch } from "../hooks/useFetch";
-import { productosService, paisesService, metodosPagoService } from "../services";
-import type { Producto } from "../services/types";
+
 
 // Shape used by the existing rendering code below.
 type CartItem = {
-  id: string;
+  id: string;       // id del registro tbl_carrito (usado para DELETE)
   title: string;
   price: number;
   image: string;
   quantity: number;
 };
 
-// Map a backend Producto into the cart shape the UI expects. Price/image are
-// not part of the Producto model yet, so we use deterministic placeholders
-// derived from the id until those entities (Precio, Imagen_Producto) are wired.
-function productoToCartItem(p: Producto): CartItem {
+// Shape real que devuelve GET /carrito?id_usuario=X
+type CarritoBackendItem = {
+  id: number;
+  id_producto: number;
+  id_usuario: number;
+  producto: { id: number; nombre: string; descripcion: string };
+};
+
+function carritoItemToCartItem(c: CarritoBackendItem): CartItem {
   return {
-    id: String(p.id),
-    title: p.nombre,
-    price: 49.99,
+    id: String(c.id),                  // id del carrito — necesario para DELETE
+    title: c.producto?.nombre ?? "Producto",
+    price: 49.99,                      // placeholder hasta conectar tbl_precio
     image:
       "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop",
     quantity: 1,
@@ -36,23 +43,55 @@ function productoToCartItem(p: Producto): CartItem {
 
 export function Checkout() {
   const navigate = useNavigate();
-
-  const {
-    data: productos,
-    loading: productosLoading,
-    error: productosError,
-  } = useFetch((signal) => productosService.list(signal), []);
+  const { usuario, loading: authLoading } = useAuthContext();
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [productosLoading, setProductosLoading] = useState(true);
+  const [productosError, setProductosError] = useState<Error | null>(null);
 
-  // Sync cart items with backend Productos once they arrive.
   useEffect(() => {
-    if (productos) setCartItems(productos.map(productoToCartItem));
-  }, [productos]);
+    if (!usuario) {
+      setProductosLoading(false);
+      return;
+    }
+
+    setProductosLoading(true);
+
+    carritoService
+      .getByUsuario(usuario.id)
+      .then((data) => {
+        setCartItems(
+          (data as CarritoBackendItem[]).map(carritoItemToCartItem)
+        );
+      })
+      .catch((err: unknown) => {
+        console.error(err);
+
+        setProductosError(
+          err instanceof Error
+            ? err
+            : new Error("Error cargando carrito")
+        );
+      })
+      .finally(() => {
+        setProductosLoading(false);
+      });
+  }, [usuario]);
 
   const [onHoldItems, setOnHoldItems] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentCountry, setPaymentCountry] = useState("");
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrImage, setQrImage] = useState("");
+
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "object" && error !== null && "message" in error) {
+      return String((error as { message?: unknown }).message);
+    }
+    if (typeof error === "string") return error;
+    return "Error desconocido";
+  };
 
   // Backend-driven Pais list for the country selector.
   const {
@@ -85,6 +124,11 @@ export function Checkout() {
   const selectedCountryName =
     backendPaises?.find((c) => String(c.id) === paymentCountry)?.nombre ?? "";
 
+  const selectedPaymentMethod =
+    backendMetodos?.find(
+      (m) => String(m.id) === paymentMethod
+    );
+
   const handleCountryChange = (country: string) => {
     setPaymentCountry(country);
   };
@@ -102,22 +146,55 @@ export function Checkout() {
   const tax = subtotal * 0.1;
   const total = subtotal + tax;
 
-  const removeItem = (id: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== id));
-    setOnHoldItems(onHoldItems.filter((i) => i !== id));
+  const removeItem = async (id: string) => {
+    try {
+      await carritoService.remove(Number(id));
+
+      setCartItems((prev) =>
+        prev.filter((item) => item.id !== id)
+      );
+
+      setOnHoldItems((prev) =>
+        prev.filter((i) => i !== id)
+      );
+    } catch (err) {
+      console.error("Error eliminando item:", err);
+    }
   };
 
   const handleCheckout = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Processing checkout...", { paymentMethod, total });
-    alert("¡Compra realizada con éxito!");
-    navigate("/");
+
+    if (!selectedPaymentMethod) {
+      alert("Selecciona un método de pago");
+      return;
+    }
+
+    const fileName = selectedPaymentMethod.nombre
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "");
+
+    setQrImage(`/qrs/${fileName}.png`);
+    setShowQrModal(true);
   };
 
   // Stock and seller info are not yet available on the backend Producto model.
   // These helpers return safe defaults so the UI renders without errors.
   const getGameStock = (_gameId: string): "unlimited" | number => "unlimited";
   const getGameSeller = (_gameId: string) => undefined;
+
+  if (authLoading || productosLoading)
+    return <p>Cargando carrito...</p>;
+
+  if (!usuario)
+    return <p>Debes iniciar sesión.</p>;
+
+  if (productosError)
+    return <p>Error cargando carrito.</p>;
+
+  if (cartItems.length === 0)
+    return <p>Tu carrito está vacío.</p>;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">
@@ -145,7 +222,7 @@ export function Checkout() {
                   </div>
                 ) : productosError ? (
                   <p className="text-center py-8 text-destructive">
-                    No se pudieron cargar los productos: {productosError.message}
+                    No se pudieron cargar los productos: {getErrorMessage(productosError)}
                   </p>
                 ) : cartItems.length === 0 ? (
                   <p className="text-center py-8 text-muted-foreground">
@@ -328,7 +405,7 @@ export function Checkout() {
                   >
                     {paisesLoading && <option value="">Cargando países…</option>}
                     {paisesError && (
-                      <option value="">Error: {paisesError.message}</option>
+                      <option value="">Error: {getErrorMessage(paisesError)}</option>
                     )}
                     {!paisesLoading && !paisesError && (!backendPaises || backendPaises.length === 0) && (
                       <option value="">Sin países configurados</option>
@@ -355,7 +432,7 @@ export function Checkout() {
                   </p>
                 ) : metodosError ? (
                   <p className="text-sm text-destructive text-center py-4">
-                    No se pudieron cargar los métodos: {metodosError.message}
+                    No se pudieron cargar los métodos: {getErrorMessage(metodosError)}
                   </p>
                 ) : !backendMetodos || backendMetodos.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">
@@ -426,6 +503,48 @@ export function Checkout() {
           </div>
         </div>
       </div>
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+          <div className="bg-background rounded-xl p-6 shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-xl text-center mb-4">
+              Escanea el código QR
+            </h3>
+
+            <img
+              src={qrImage}
+              alt="Código QR de pago"
+              className="w-72 h-72 object-contain mx-auto"
+            />
+
+            <p className="text-sm text-muted-foreground text-center mt-4">
+              Completa el pago y luego confirma.
+            </p>
+
+            <Button
+              className="w-full mt-6"
+              onClick={() => {
+                setShowQrModal(false);
+
+                alert(
+                  "Pago registrado. Pendiente de validación."
+                );
+
+                navigate("/");
+              }}
+            >
+              He realizado el pago
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full mt-2"
+              onClick={() => setShowQrModal(false)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

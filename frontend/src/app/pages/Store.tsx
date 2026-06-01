@@ -5,9 +5,11 @@ import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2 } from "lucide-react";
 import { useStore } from "../data/store-context";
-import { useFetch } from "../hooks";  
+import { useFetch } from "../hooks";
 import { productosService, categoriasService } from "../services";
 import type { Seller } from "../data/games";
+import { carritoService } from "../services/carrito.service";
+import { useAuthContext } from "../contexts/AuthContext";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "xs" }) {
@@ -19,13 +21,12 @@ function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "xs
       {[1, 2, 3, 4, 5].map((i) => (
         <Star
           key={i}
-          className={`${iconSize} ${
-            i <= full
-              ? "fill-amber-400 text-amber-400"
-              : i === full + 1 && half
+          className={`${iconSize} ${i <= full
+            ? "fill-amber-400 text-amber-400"
+            : i === full + 1 && half
               ? "fill-amber-400/50 text-amber-400"
               : "fill-muted text-muted-foreground/30"
-          }`}
+            }`}
         />
       ))}
     </span>
@@ -137,6 +138,8 @@ export function Store() {
   const store = useStore();
   const [selectedCategory, setSelectedCategory] = useState<string>("Todos");
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
+  const { usuario } = useAuthContext();
+  const [agregando, setAgregando] = useState<number | null>(null);
 
   // Fetch real products from the backend via the service layer.
   const {
@@ -163,6 +166,18 @@ export function Store() {
 
   const addToCart = (_productoId: number) => {
     navigate("/checkout");
+  };
+
+  const handleAgregar = async (id_producto: number) => {
+    if (!usuario) return;
+    setAgregando(id_producto);
+    try {
+      await carritoService.add(id_producto, usuario.id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAgregando(null);
+    }
   };
 
   return (
@@ -298,11 +313,14 @@ export function Store() {
                     <span className="text-xl text-primary">—</span>
                     <Button
                       size="sm"
-                      onClick={() => addToCart(producto.id)}
+                      onClick={() => handleAgregar(producto.id)}
+                      disabled={agregando === producto.id}
                       className="bg-secondary hover:bg-secondary/90"
                     >
                       <ShoppingCart className="w-4 h-4 mr-1" />
-                      Agregar
+                      {agregando === producto.id
+                        ? "Agregando..."
+                        : "Agregar al carrito"}
                     </Button>
                   </div>
                 </div>

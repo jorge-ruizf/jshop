@@ -9,3 +9,4 @@ export { paisesService } from "./paises.service";
 export { videojuegoService } from "./videojuegos.service";
 export { metodosPagoService } from "./metodosPago.service";
 export { imagenesProductoService } from "./imagenesProducto.service";
+export { carritoService } from "./carrito.service";
