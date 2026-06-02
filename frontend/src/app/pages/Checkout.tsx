@@ -522,14 +522,40 @@ export function Checkout() {
 
             <Button
               className="w-full mt-6"
-              onClick={() => {
-                setShowQrModal(false);
+              onClick={async () => {
+                try {
+                  const metodoSeleccionado =
+                    backendMetodos?.find(
+                      (m) => String(m.id) === paymentMethod
+                    );
 
-                alert(
-                  "Pago registrado. Pendiente de validación."
-                );
+                  await fetch("/api/pagos/reportar", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      id_usuario: usuario.id,
+                      metodo_pago:
+                        metodoSeleccionado?.nombre ?? "Desconocido",
+                      total,
+                    }),
+                  });
 
-                navigate("/");
+                  setShowQrModal(false);
+
+                  alert(
+                    "Pago reportado correctamente. Será validado por un administrador."
+                  );
+
+                  navigate("/");
+                } catch (err) {
+                  console.error(err);
+
+                  alert(
+                    "No se pudo registrar el pago."
+                  );
+                }
               }}
             >
               He realizado el pago
