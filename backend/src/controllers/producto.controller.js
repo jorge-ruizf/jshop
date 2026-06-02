@@ -84,42 +84,22 @@ export async function deleteProducto(req, res, next) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function uploadImageFromUrl(req, res, next) {
+export async function createImagen(req, res, next) {
   try {
-    const { url } = req.body;
-    const id = req.id;
+    const { ruta } = req.body;
+    if (!ruta) return res.status(400).json({ error: { message: 'Missing field: ruta' } });
 
-    if (!url) {
-      return res.status(400).json({ error: { message: 'Missing required field: url' } });
-    }
+    const producto = await prisma.producto.findUnique({ where: { id: req.id } });
+    if (!producto) return res.status(404).json({ error: { message: 'Producto not found' } });
 
-    // Verificar que el producto existe
-    const producto = await prisma.producto.findUnique({ where: { id } });
-    if (!producto) {
-      return res.status(404).json({ error: { message: 'Producto not found' } });
-    }
-
-    // Descargar imagen desde URL externa
-    const response = await fetch(url);
-    if (!response.ok) {
-      return res.status(400).json({ error: { message: 'No se pudo descargar la imagen desde la URL' } });
-    }
-
-    const contentType = response.headers.get('content-type') ?? '';
-    if (!contentType.startsWith('image/')) {
-      return res.status(400).json({ error: { message: 'La URL no apunta a una imagen válida' } });
-    }
-
-    // Guardar en /public/imgs/{id}.png
-    const imgsDir = path.join(__dirname, '../public/imgs');
-    if (!fs.existsSync(imgsDir)) fs.mkdirSync(imgsDir, { recursive: true });
-
-    const filePath = path.join(imgsDir, `${id}.png`);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
-
-    res.json({ path: `/imgs/${id}.png` });
-  } catch (err) {
-    next(err);
-  }
+    const imagen = await prisma.Imagen_Producto.create({
+      data: {
+        nombre: `${req.id}.png`,
+        ruta,
+        id_producto: req.id,
+        id_tipo_imagen: 1,
+      },
+    });
+    res.status(201).json(imagen);
+  } catch (err) { next(err); }
 }
