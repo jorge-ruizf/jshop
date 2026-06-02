@@ -16,6 +16,7 @@ import { imagenProductoRouter } from './imagenProducto.routes.js';
 import { valoracionRouter } from './valoracion.routes.js';
 import { notificacionRouter } from './notificacion.routes.js';
 import { videojuegoRouter } from './videojuego.routes.js';
+import { pagosRouter } from './pagos.routes.js';
 
 const apiRouter = Router();
 
