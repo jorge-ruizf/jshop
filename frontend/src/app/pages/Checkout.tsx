@@ -243,7 +243,12 @@ export function Checkout() {
                               className="flex gap-4 p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                             >
                               <img
-                                src={item.image}
+
+                                /*src={
+                                  producto.imagenes?.[0]?.ruta ??
+                                  'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
+                                }*/
+                                src={item.image} asi estaba antes al parecer 
                                 onError={(e) => {
                                   // fallback si el producto aún no tiene imagen local
                                   (e.target as HTMLImageElement).src =

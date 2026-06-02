@@ -285,12 +285,10 @@ export function Store() {
               >
                 <div className="relative overflow-hidden">
                   <img
-                    src={`/imgs/${producto.id}.png`}
-                    onError={(e) => {
-                      // fallback si el producto aún no tiene imagen local
-                      (e.target as HTMLImageElement).src =
-                        'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop';
-                    }}
+                    src={
+                      producto.imagenes?.[0]?.ruta ??
+                      'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
+                    }
                     alt={producto.nombre}
                     className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                   />

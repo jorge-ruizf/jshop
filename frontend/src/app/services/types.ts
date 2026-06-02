@@ -66,3 +66,31 @@ export interface CarritoItem {
   id_producto: number;
   id_usuario: number;
 }
+
+export interface Imagen_Producto {
+  id: number;
+  nombre: string;
+  ruta: string;
+  id_producto: number;
+  id_tipo_imagen: number;
+}
+
+export interface Precio {
+  id: number;
+  precio: number;
+  id_pais: number;
+  id_producto: number;
+}
+
+export interface Producto {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  id_vendedor: number;
+  id_categoria: number;
+  id_pais: number;
+  id_videojuego: number;
+  // Relaciones incluidas por el backend (include en controller)
+  imagenes?: Imagen_Producto[];
+  precios?: Precio[];
+}

@@ -13,6 +13,7 @@ import {
   videojuegoService,
   metodosPagoService,
   usuariosService,
+  storageService,
 } from "../services";
 import type { Pais, Videojuego, MetodoPago, Producto, Usuario } from "../services/types";
 import {
@@ -149,6 +150,7 @@ function ProductsSection() {
   const [videojuegoId, setVideojuegoId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
   const [image, setImage] = useState("");
+  
 
   const resetForm = () => {
     setTitle("");
@@ -176,7 +178,8 @@ function ProductsSection() {
 
       if (image.trim()) {
         try {
-          await productosService.uploadImage(nuevo.id, image.trim());
+          const publicUrl = await storageService.uploadFromUrl(nuevo.id, image.trim());
+          await productosService.addImagen(nuevo.id, publicUrl);
         } catch {
           // imagen falló pero el producto ya existe — no revertir
           console.warn('Producto creado pero la imagen no se pudo guardar.');
