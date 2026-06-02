@@ -1,6 +1,6 @@
 import type { CarritoItem } from "./types";
 
-const BASE = "/api/carrito"; // ajusta si tu base URL es diferente
+const BASE = "https://jshop-edzf.onrender.com/api/carrito";
 
 export const carritoService = {
 
