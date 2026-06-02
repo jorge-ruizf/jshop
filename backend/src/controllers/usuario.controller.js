@@ -88,6 +88,9 @@ export async function deleteUsuario(req, res, next) {
 
 export async function getUsuarioByCorreo(req, res, next) {
   try {
+
+    console.log("BUSCANDO CORREO:", req.query.correo);
+
     const { correo } = req.query;
 
     if (!correo) {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireFields, parseId } from '../middlewares/validateBody.js';
 import {
   listProductos, getProducto, createProducto, updateProducto, deleteProducto,
+  uploadImageFromUrl,
 } from '../controllers/producto.controller.js';
 
 const productoRouter = Router();
@@ -16,5 +17,6 @@ productoRouter.post(
 );
 productoRouter.put('/:id', parseId, updateProducto);
 productoRouter.delete('/:id', parseId, deleteProducto);
+productoRouter.post('/:id/imagen', parseId, uploadImageFromUrl);
 
 export { productoRouter };

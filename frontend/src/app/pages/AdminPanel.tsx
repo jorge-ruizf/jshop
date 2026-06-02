@@ -55,11 +55,10 @@ function SubTabs({
           key={t.key}
           type="button"
           onClick={() => onChange(t.key)}
-          className={`flex-1 py-2 px-3 rounded-md text-sm transition-colors cursor-pointer ${
-            active === t.key
+          className={`flex-1 py-2 px-3 rounded-md text-sm transition-colors cursor-pointer ${active === t.key
               ? "bg-white shadow-sm text-foreground"
               : "text-muted-foreground hover:text-foreground"
-          }`}
+            }`}
         >
           {t.label}
         </button>
@@ -75,13 +74,12 @@ function StarRatingDisplay({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <Star
           key={i}
-          className={`w-3 h-3 ${
-            i <= Math.floor(rating)
+          className={`w-3 h-3 ${i <= Math.floor(rating)
               ? "fill-amber-400 text-amber-400"
               : i === Math.floor(rating) + 1 && rating - Math.floor(rating) >= 0.5
-              ? "fill-amber-400/50 text-amber-400"
-              : "fill-muted text-muted-foreground/30"
-          }`}
+                ? "fill-amber-400/50 text-amber-400"
+                : "fill-muted text-muted-foreground/30"
+            }`}
         />
       ))}
       <span className="text-xs text-amber-500 ml-0.5">{rating.toFixed(1)}</span>
@@ -165,14 +163,26 @@ function ProductsSection() {
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     mutate(async () => {
-      await productosService.create({
+      const payload: Omit<Producto, "id"> & { id_videojuego: number } = {
         nombre: title.trim(),
         descripcion: description.trim(),
         id_categoria: Number(categoryId),
         id_pais: Number(paisId),
-        //id_videojuego: Number(videojuegoId),
+        id_videojuego: Number(videojuegoId),
         id_vendedor: Number(vendedorId) || 0,
-      });
+      };
+
+      const nuevo = await productosService.create(payload);
+
+      if (image.trim()) {
+        try {
+          await productosService.uploadImage(nuevo.id, image.trim());
+        } catch {
+          // imagen falló pero el producto ya existe — no revertir
+          console.warn('Producto creado pero la imagen no se pudo guardar.');
+        }
+      }
+
       resetForm();
       refreshProductos();
     });
@@ -306,19 +316,19 @@ function ProductsSection() {
           <div className="space-y-2">
             <Label>País *</Label>
             <select
-                value={paisId}
-                onChange={(e) => setPaisId(e.target.value)}
-                required
-                disabled={paisesLoading || mutating}
-                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={paisId}
+              onChange={(e) => setPaisId(e.target.value)}
+              required
+              disabled={paisesLoading || mutating}
+              className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">
                 {paisesLoading ? "Cargando países…" : "Selecciona un país"}
               </option>
               {(paises ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
               ))}
             </select>
           </div>
@@ -326,19 +336,19 @@ function ProductsSection() {
           <div className="space-y-2">
             <Label>Videojuego *</Label>
             <select
-                value={videojuegoId}
-                onChange={(e) => setVideojuegoId(e.target.value)}
-                required
-                disabled={videojuegosLoading || mutating}
-                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={videojuegoId}
+              onChange={(e) => setVideojuegoId(e.target.value)}
+              required
+              disabled={videojuegosLoading || mutating}
+              className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">
                 {videojuegosLoading ? "Cargando videojuegos…" : "Selecciona un videojuego"}
               </option>
               {(videojuegos ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
               ))}
             </select>
           </div>
@@ -915,7 +925,7 @@ function VideogamesSection() {
           ) : !videojuegos || videojuegos.length === 0 ? (
             <p className="text-center py-6 text-muted-foreground">No hay videojuegos configurados</p>
           ) : (
-              videojuegos.map((c) => (
+            videojuegos.map((c) => (
               <div
                 key={c.id}
                 className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30"
@@ -1001,8 +1011,8 @@ function PaymentMethodsSection() {
   } = useFetch((signal) => metodosPagoService.list(signal), []);
 
   const { data: paises, loading: paisesLoading } = useFetch(
-      (signal) => paisesService.list(signal),
-      [],
+    (signal) => paisesService.list(signal),
+    [],
   );
 
   const [tab, setTab] = useState("add");
@@ -1021,10 +1031,10 @@ function PaymentMethodsSection() {
     if (!trimmed) return;
     mutate(async () => {
       await metodosPagoService.create(
-          {
-            nombre: trimmed,
-            id_pais: Number(paisId),
-          });
+        {
+          nombre: trimmed,
+          id_pais: Number(paisId),
+        });
       setName("");
       setDescription("");
       setPaisId("");
@@ -1077,19 +1087,19 @@ function PaymentMethodsSection() {
           </div>
           <div className="space-y-1">
             <select
-                value={paisId}
-                onChange={(e) => setPaisId(e.target.value)}
-                required
-                disabled={paisesLoading || mutating}
-                className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={paisId}
+              onChange={(e) => setPaisId(e.target.value)}
+              required
+              disabled={paisesLoading || mutating}
+              className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">
                 {paisesLoading ? "Cargando países…" : "Selecciona un país"}
               </option>
               {(paises ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
               ))}
             </select>
           </div>
@@ -1325,16 +1335,14 @@ function OffersSection() {
             offers.map((o) => (
               <div
                 key={o.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border ${
-                  o.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"
-                }`}
+                className={`flex items-center gap-3 p-3 rounded-lg border ${o.archived ? "bg-muted/30 opacity-60" : "bg-muted/10 hover:bg-muted/30"
+                  }`}
               >
                 <Percent className="w-4 h-4 text-accent flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p
-                    className={`truncate ${
-                      o.archived ? "line-through text-muted-foreground" : ""
-                    }`}
+                    className={`truncate ${o.archived ? "line-through text-muted-foreground" : ""
+                      }`}
                   >
                     {getProductoNombre(o.productoId)} —{" "}
                     <span className="text-accent">{o.discountPercent}% OFF</span>
@@ -1702,12 +1710,12 @@ export function AdminPanel() {
           </AdminExpandableCard>
 
           <AdminExpandableCard
-              icon={<Globe className="w-5 h-5" />}
-              title="Videojuegos"
-              subtitle={videojuegosSubtitle}
-              accentColor="bg-amber-500/10 text-amber-600"
-              count={backendVideojuegos?.length ?? undefined}
-              countLabel="videojuegos"
+            icon={<Globe className="w-5 h-5" />}
+            title="Videojuegos"
+            subtitle={videojuegosSubtitle}
+            accentColor="bg-amber-500/10 text-amber-600"
+            count={backendVideojuegos?.length ?? undefined}
+            countLabel="videojuegos"
           >
             <VideogamesSection />
 

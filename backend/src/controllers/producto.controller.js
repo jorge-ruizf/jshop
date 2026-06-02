@@ -1,4 +1,8 @@
 import { prisma } from '../services/prisma.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
 
 // CAMBIOS vs versión anterior:
 // ✅ Añadido id_videojuego (FK requerida en el schema).
@@ -74,4 +78,48 @@ export async function deleteProducto(req, res, next) {
     await prisma.producto.delete({ where: { id: req.id } });
     res.status(204).end();
   } catch (err) { next(err); }
+}
+
+//  nueva función para subir imagen desde URL externa, guardándola en /public/imgs/{id}.png
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export async function uploadImageFromUrl(req, res, next) {
+  try {
+    const { url } = req.body;
+    const id = req.id;
+
+    if (!url) {
+      return res.status(400).json({ error: { message: 'Missing required field: url' } });
+    }
+
+    // Verificar que el producto existe
+    const producto = await prisma.producto.findUnique({ where: { id } });
+    if (!producto) {
+      return res.status(404).json({ error: { message: 'Producto not found' } });
+    }
+
+    // Descargar imagen desde URL externa
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res.status(400).json({ error: { message: 'No se pudo descargar la imagen desde la URL' } });
+    }
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).json({ error: { message: 'La URL no apunta a una imagen válida' } });
+    }
+
+    // Guardar en /public/imgs/{id}.png
+    const imgsDir = path.join(__dirname, '../public/imgs');
+    if (!fs.existsSync(imgsDir)) fs.mkdirSync(imgsDir, { recursive: true });
+
+    const filePath = path.join(imgsDir, `${id}.png`);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(filePath, buffer);
+
+    res.json({ path: `/imgs/${id}.png` });
+  } catch (err) {
+    next(err);
+  }
 }

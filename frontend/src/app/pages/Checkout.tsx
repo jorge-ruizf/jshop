@@ -244,6 +244,11 @@ export function Checkout() {
                             >
                               <img
                                 src={item.image}
+                                onError={(e) => {
+                                  // fallback si el producto aún no tiene imagen local
+                                  (e.target as HTMLImageElement).src =
+                                    'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop';
+                                }}
                                 alt={item.title}
                                 className="w-24 h-24 object-cover rounded"
                               />

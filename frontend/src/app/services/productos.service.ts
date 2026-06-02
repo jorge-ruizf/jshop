@@ -8,4 +8,14 @@ export const productosService = {
   update: (id: number, data: Partial<Omit<Producto, "id">>) =>
     http.put<Producto>(`/productos/${id}`, data),
   remove: (id: number) => http.del<void>(`/productos/${id}`),
+  uploadImage: async (id: number, url: string): Promise<{ path: string }> => {
+    const res = await fetch(`/api/productos/${id}/imagen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error('Error al guardar la imagen');
+    return res.json();
+  },
 };
+
