@@ -11,6 +11,7 @@ import { paisesService, metodosPagoService } from "../services";
 import { useAuthContext } from "../contexts/AuthContext";
 import { carritoService } from "../services/carrito.service";
 import { useFetch } from "../hooks/useFetch";
+import { pagosService } from "../services/pagos.service";
 
 
 // Shape used by the existing rendering code below.
@@ -529,17 +530,11 @@ export function Checkout() {
                       (m) => String(m.id) === paymentMethod
                     );
 
-                  await fetch("/api/pagos/reportar", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      id_usuario: usuario.id,
-                      metodo_pago:
-                        metodoSeleccionado?.nombre ?? "Desconocido",
-                      total,
-                    }),
+                  await pagosService.reportar({
+                    id_usuario: usuario.id,
+                    metodo_pago:
+                      metodoSeleccionado?.nombre ?? "Desconocido",
+                    total,
                   });
 
                   setShowQrModal(false);
@@ -553,12 +548,12 @@ export function Checkout() {
                   console.error(err);
 
                   alert(
-                    "No se pudo registrar el pago."
+                    "No se pudo reportar el pago. Inténtalo nuevamente."
                   );
                 }
               }}
             >
-              He realizado el pago
+              Ya realicé la transferencia
             </Button>
 
             <Button
