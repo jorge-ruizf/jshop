@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../services/prisma.js";
 import { sendDiscordMessage } from "../services/discord.service.js";
+import { notificarPagoDiscord } from "../controllers/pagos.controller.js";
 
 const pagosRouter = Router();
 
