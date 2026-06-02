@@ -57,8 +57,8 @@ function SubTabs({
           type="button"
           onClick={() => onChange(t.key)}
           className={`flex-1 py-2 px-3 rounded-md text-sm transition-colors cursor-pointer ${active === t.key
-              ? "bg-white shadow-sm text-foreground"
-              : "text-muted-foreground hover:text-foreground"
+            ? "bg-white shadow-sm text-foreground"
+            : "text-muted-foreground hover:text-foreground"
             }`}
         >
           {t.label}
@@ -76,10 +76,10 @@ function StarRatingDisplay({ rating }: { rating: number }) {
         <Star
           key={i}
           className={`w-3 h-3 ${i <= Math.floor(rating)
-              ? "fill-amber-400 text-amber-400"
-              : i === Math.floor(rating) + 1 && rating - Math.floor(rating) >= 0.5
-                ? "fill-amber-400/50 text-amber-400"
-                : "fill-muted text-muted-foreground/30"
+            ? "fill-amber-400 text-amber-400"
+            : i === Math.floor(rating) + 1 && rating - Math.floor(rating) >= 0.5
+              ? "fill-amber-400/50 text-amber-400"
+              : "fill-muted text-muted-foreground/30"
             }`}
         />
       ))}
@@ -149,8 +149,9 @@ function ProductsSection() {
   const [paisId, setPaisId] = useState("");
   const [videojuegoId, setVideojuegoId] = useState("");
   const [vendedorId, setVendedorId] = useState("");
-  const [image, setImage] = useState("");
-  
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+
 
   const resetForm = () => {
     setTitle("");
@@ -159,30 +160,28 @@ function ProductsSection() {
     setPaisId("");
     setVideojuegoId("");
     setVendedorId("");
-    setImage("");
+    setImageFile(null);
+    setImagePreview("");
   };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     mutate(async () => {
-      const payload: Omit<Producto, "id"> & { id_videojuego: number } = {
+      const nuevo = await productosService.create({
         nombre: title.trim(),
         descripcion: description.trim(),
         id_categoria: Number(categoryId),
         id_pais: Number(paisId),
         id_videojuego: Number(videojuegoId),
         id_vendedor: Number(vendedorId) || 0,
-      };
+      });
 
-      const nuevo = await productosService.create(payload);
-
-      if (image.trim()) {
+      if (imageFile) {
         try {
-          const publicUrl = await storageService.uploadFromUrl(nuevo.id, image.trim());
+          const publicUrl = await storageService.uploadFile(nuevo.id, imageFile);
           await productosService.addImagen(nuevo.id, publicUrl);
-        } catch {
-          // imagen falló pero el producto ya existe — no revertir
-          console.warn('Producto creado pero la imagen no se pudo guardar.');
+        } catch (err) {
+          console.warn('Imagen no guardada:', err);
         }
       }
 
@@ -357,32 +356,32 @@ function ProductsSection() {
           </div>
 
           <div className="space-y-2">
-            <Label>URL de la Imagen *</Label>
+            <Label>Imagen del Producto*</Label>
             <div className="flex gap-2">
               <Input
-                type="url"
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
+                type="file"
+                accept="image/*"
+                disabled={mutating}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setImageFile(file);
+                  setImagePreview(file ? URL.createObjectURL(file) : "");
+                }}
                 placeholder="https://example.com/image.jpg"
                 required
-                className="flex-1"
-                disabled={mutating}
+                className="h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring file:border-0 file:bg-transparent file:text-sm file:font-medium cursor-pointer"
               />
-              <Button type="button" variant="outline" size="icon">
-                <Upload className="w-4 h-4" />
-              </Button>
+              {/*<Button type="button" variant="outline" size="icon">
+                  <Upload className="w-4 h-4" />
+                </Button>*/}
             </div>
-            {image && (
+            {imagePreview && (
               <div className="mt-2 p-2 border rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Vista previa:</p>
                 <img
-                  src={image}
+                  src={imagePreview}
                   alt="Preview"
                   className="w-full max-w-xs h-32 object-cover rounded"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "https://via.placeholder.com/300x200?text=Invalid";
-                  }}
                 />
               </div>
             )}

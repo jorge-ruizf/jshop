@@ -4,30 +4,19 @@ const BUCKET = 'productos';
 
 export const storageService = {
 
-  uploadFromUrl: async (productoId: number, url: string): Promise<string> => {
-    // 1. Descargar imagen desde URL externa
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('No se pudo descargar la imagen');
+  uploadFile: async (productoId: number, file: File): Promise<string> => {
+    const ext = file.name.split('.').pop() ?? 'png';
+    const path = `${productoId}.${ext}`;
 
-    const contentType = response.headers.get('content-type') ?? 'image/png';
-    if (!contentType.startsWith('image/')) {
-      throw new Error('La URL no apunta a una imagen válida');
-    }
-
-    const blob = await response.blob();
-    const path = `${productoId}.png`;
-
-    // 2. Subir a Supabase Storage
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(path, blob, {
-        contentType: 'image/png',
-        upsert: true,       // sobreescribe si ya existe
+      .upload(path, file, {
+        contentType: file.type,
+        upsert: true,
       });
 
     if (error) throw new Error(`Supabase Storage error: ${error.message}`);
 
-    // 3. Retornar URL pública permanente
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
   },
