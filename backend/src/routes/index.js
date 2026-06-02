@@ -50,6 +50,9 @@ apiRouter.use('/notificaciones', notificacionRouter);
 apiRouter.use('/videojuegos', videojuegoRouter);
 
 
+// PAGOS DISCORD
+apiRouter.use("/pagos", pagosRouter);
+
 export { apiRouter };
 
 
