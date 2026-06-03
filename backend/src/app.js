@@ -7,7 +7,10 @@ import { notFound } from './middlewares/notFound.js';
 const app = express();
 
 app.use(cors({
-  origin: true,
+  origin: [
+    'https://jshop-kappa.vercel.app',
+    'http://localhost:5173',
+  ],
   credentials: true,
 }));
 
