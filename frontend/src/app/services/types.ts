@@ -1,6 +1,3 @@
-// Shared resource types matching the backend Prisma schema.
-// Keep in sync with backend/prisma/schema.prisma.
-
 export interface Usuario {
   id: number;
   nombre: string;
@@ -9,62 +6,6 @@ export interface Usuario {
   id_pais: number;
   id_rol: number;
   id_metodo_pago_fav: number;
-}
-
-export interface Producto {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  id_vendedor: number;
-  id_categoria: number;
-  id_pais: number;
-}
-
-export interface Categoria {
-  id: number;
-  nombre: string;
-}
-
-export interface Pais {
-  id: number;
-  nombre: string;
-}
-
-export interface Videojuego {
-  id: number;
-  nombre: string;
-}
-
-export interface MetodoPago {
-  id: number;
-  nombre: string;
-  id_pais: number;
-}
-
-export interface ImagenProducto {
-  id: number;
-  id_producto: number;
-  url: string;
-}
-
-export interface Venta {
-  id: number;
-  id_usuario: number;
-  metodo_pago: number;
-}
-
-export interface VentaXProducto {
-  id: number;
-  id_producto: number;
-  id_venta: number;
-  cantidad: number;
-  precio: number;
-}
-
-export interface CarritoItem {
-  id: number;
-  id_producto: number;
-  id_usuario: number;
 }
 
 export interface Imagen_Producto {
@@ -90,7 +31,54 @@ export interface Producto {
   id_categoria: number;
   id_pais: number;
   id_videojuego: number;
-  // Relaciones incluidas por el backend (include en controller)
   imagenes?: Imagen_Producto[];
   precios?: Precio[];
+}
+
+export interface Categoria {
+  id: number;
+  nombre: string;
+}
+
+export interface Pais {
+  id: number;
+  nombre: string;
+}
+
+export interface Videojuego {
+  id: number;
+  nombre: string;
+}
+
+export interface MetodoPago {
+  id: number;
+  nombre: string;
+  id_pais: number;
+}
+
+// Mantenido por compatibilidad — usar Imagen_Producto para nuevos usos
+export interface ImagenProducto {
+  id: number;
+  id_producto: number;
+  ruta: string;  // corregido: era "url", el schema usa "ruta"
+}
+
+export interface Venta {
+  id: number;
+  id_usuario: number;
+  metodo_pago: number;
+}
+
+export interface VentaXProducto {
+  id: number;
+  id_producto: number;
+  id_venta: number;
+  cantidad: number;
+  precio: number;
+}
+
+export interface CarritoItem {
+  id: number;
+  id_producto: number;
+  id_usuario: number;
 }
