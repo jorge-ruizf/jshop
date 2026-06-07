@@ -10,6 +10,7 @@ import { productosService, categoriasService } from "../services";
 import type { Seller } from "../data/games";
 import { carritoService } from "../services/carrito.service";
 import { useAuthContext } from "../contexts/AuthContext";
+import type { Producto } from "../services/types";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "xs" }) {
@@ -180,6 +181,13 @@ export function Store() {
     }
   };
 
+  const getPrecio = (producto: Producto): string => {
+    if (!usuario?.id_pais || !producto.precios?.length) return '—';
+    const match = producto.precios.find((p) => p.id_pais === usuario.id_pais);
+    if (!match) return '—';
+    return `$${Number(match.precio).toFixed(2)}`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Hero Section */}
@@ -309,7 +317,7 @@ export function Store() {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xl text-primary">—</span>
+                    <span className="text-xl text-primary">{getPrecio(producto)}</span>
                     <Button
                       size="sm"
                       onClick={() => handleAgregar(producto.id)}

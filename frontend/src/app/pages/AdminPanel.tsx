@@ -5,7 +5,8 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
-import { useFetch } from "../hooks/useFetch";
+//import { useFetch } from "../hooks/useFetch";
+import { useFetch } from '../hooks';
 import {
   productosService,
   categoriasService,
@@ -14,7 +15,9 @@ import {
   metodosPagoService,
   usuariosService,
   storageService,
+  preciosService,
 } from "../services";
+
 import type { Pais, Videojuego, MetodoPago, Producto, Usuario } from "../services/types";
 import {
   Plus,
@@ -115,6 +118,7 @@ function ProductsSection() {
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const { loading: mutating, error: mutationError, mutate } = useMutation();
+  const [prices, setPrices] = useState<Record<string, string>>({});
 
   const { data: categorias, loading: categoriasLoading } = useFetch(
     (signal) => categoriasService.list(signal),
@@ -143,6 +147,7 @@ function ProductsSection() {
     refresh: refreshProductos,
   } = useFetch((signal) => productosService.list(signal), []);
 
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -162,33 +167,45 @@ function ProductsSection() {
     setVendedorId("");
     setImageFile(null);
     setImagePreview("");
+    setPrices({});
   };
 
   const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    mutate(async () => {
-      const nuevo = await productosService.create({
-        nombre: title.trim(),
-        descripcion: description.trim(),
-        id_categoria: Number(categoryId),
-        id_pais: Number(paisId),
-        id_videojuego: Number(videojuegoId),
-        id_vendedor: Number(vendedorId) || 0,
-      });
-
-      if (imageFile) {
-        try {
-          const publicUrl = await storageService.uploadFile(nuevo.id, imageFile);
-          await productosService.addImagen(nuevo.id, publicUrl);
-        } catch (err) {
-          console.warn('Imagen no guardada:', err);
-        }
-      }
-
-      resetForm();
-      refreshProductos();
+  e.preventDefault();
+  mutate(async () => {
+    const nuevo = await productosService.create({
+      nombre: title.trim(),
+      descripcion: description.trim(),
+      id_categoria: Number(categoryId),
+      id_pais: Number(paisId),
+      id_videojuego: Number(videojuegoId),
+      id_vendedor: Number(vendedorId) || 0,
     });
-  };
+
+    const preciosPayload = Object.entries(prices)
+      .filter(([, valor]) => valor !== '' && Number(valor) >= 0)
+      .map(([id_pais, precio]) => ({
+        id_pais: Number(id_pais),
+        precio: Number(precio),
+      }));
+
+    if (preciosPayload.length > 0) {
+      await preciosService.bulk(nuevo.id, preciosPayload);
+    }
+
+    if (imageFile) {
+      try {
+        const publicUrl = await storageService.uploadFile(nuevo.id, imageFile);
+        await productosService.addImagen(nuevo.id, publicUrl);
+      } catch (err) {
+        console.warn('Imagen no guardada:', err);
+      }
+    }
+
+    resetForm();
+    refreshProductos();
+  });
+};
 
   const startEdit = (p: Producto) => {
     setEditingId(p.id);
@@ -353,6 +370,39 @@ function ProductsSection() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Precios por País */}
+          <div className="space-y-3">
+            <div className="border-b pb-2">
+              <h4 className="text-[0.95rem]">Precios por País *</h4>
+              <p className="text-sm text-muted-foreground">
+                Moneda local de cada país
+              </p>
+            </div>
+            {!paises || paises.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Cargando países…</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {paises.map((p) => (
+                  <div key={p.id} className="space-y-1">
+                    {/* flag comentado — implementar después cuando Pais tenga campo bandera */}
+                    <Label className="text-sm">{p.nombre}</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={prices[String(p.id)] ?? ''}
+                      onChange={(e) =>
+                        setPrices({ ...prices, [String(p.id)]: e.target.value })
+                      }
+                      placeholder="0.00"
+                      disabled={mutating}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

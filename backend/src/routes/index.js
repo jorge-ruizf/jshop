@@ -17,6 +17,7 @@ import { valoracionRouter } from './valoracion.routes.js';
 import { notificacionRouter } from './notificacion.routes.js';
 import { videojuegoRouter } from './videojuego.routes.js';
 import { pagosRouter } from './pagos.routes.js';
+import { precioRouter } from './precio.routes.js';
 
 const apiRouter = Router();
 
@@ -33,6 +34,7 @@ apiRouter.use('/paises', paisRouter);
 apiRouter.use('/ventas', ventaRouter);
 apiRouter.use('/ventas-productos', ventaProductoRouter);
 apiRouter.use('/carrito', carritoRouter);
+apiRouter.use('/precios', precioRouter);
 
 // SOCIAL / CHAT
 apiRouter.use('/chats', chatRouter);

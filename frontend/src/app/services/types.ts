@@ -21,6 +21,7 @@ export interface Precio {
   precio: number;
   id_pais: number;
   id_producto: number;
+  pais?: { id: number; nombre: string };  // incluido por el backend
 }
 
 export interface Producto {
