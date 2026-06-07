@@ -197,7 +197,7 @@ export function Store() {
             Bienvenido a JShop
           </h1>
           <p className="text-xl text-white/90 max-w-2xl mx-auto">
-            Descubre los mejores videojuegos para todas las plataformas
+            Descubre las mejores cuentas y ofertas para tus videojuegos favoritos
           </p>
         </div>
       </div>

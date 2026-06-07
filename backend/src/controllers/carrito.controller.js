@@ -6,7 +6,15 @@ export async function listCarrito(req, res, next) {
     if (req.query.id_usuario) where.id_usuario = Number(req.query.id_usuario);
     res.json(await prisma.carrito.findMany({
       where,
-      include: { producto: true, usuario: true },
+      include: {
+        usuario: true,
+        producto: {
+          include: {
+            imagenes: true,
+            precios: true,
+          },
+        },
+      },
     }));
   } catch (err) { next(err); }
 }
