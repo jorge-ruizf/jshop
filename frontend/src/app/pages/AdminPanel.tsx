@@ -16,6 +16,7 @@ import {
   usuariosService,
   storageService,
   preciosService,
+  imagenesProductoService,
 } from "../services";
 
 import type { Pais, Videojuego, MetodoPago, Producto, Usuario } from "../services/types";
@@ -145,7 +146,7 @@ function ProductsSection() {
   const [vendedorId, setVendedorId] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
-
+  const [uploadingImagen, setUploadingImagen] = useState(false);
 
   const resetForm = () => {
     setTitle("");
@@ -245,9 +246,7 @@ function ProductsSection() {
 
   const handleDeleteImagen = async (imagenId: number) => {
     try {
-      await fetch(`${(await import('../services/api')).API_URL}/imagenes-producto/${imagenId}`, {
-        method: 'DELETE',
-      });
+      await imagenesProductoService.remove(imagenId);
       setEditImagenes((prev) => prev.filter((img) => img.id !== imagenId));
     } catch (err) {
       console.error('Error eliminando imagen:', err);
@@ -255,14 +254,15 @@ function ProductsSection() {
   };
 
   const handleAddImagen = async (productoId: number, file: File) => {
+    setUploadingImagen(true);
     try {
       const publicUrl = await storageService.uploadFile(productoId, file);
       await productosService.addImagen(productoId, publicUrl);
-      // Refrescar imágenes localmente
       setEditImagenes((prev) => [...prev, { id: Date.now(), ruta: publicUrl }]);
-      refreshProductos();
     } catch (err) {
       console.error('Error agregando imagen:', err);
+    } finally {
+      setUploadingImagen(false);
     }
   };
 
@@ -672,12 +672,16 @@ function ProductsSection() {
                         ))}
 
                         {/* Botón agregar imagen */}
-                        <label className="w-14 h-14 flex-shrink-0 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/30 transition-colors">
-                          <ImagePlus className="w-5 h-5 text-muted-foreground" />
+                        <label className={`w-14 h-14 flex-shrink-0 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/30 transition-colors ${uploadingImagen ? 'opacity-50 pointer-events-none' : ''}`}>
+                          {uploadingImagen
+                            ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                            : <ImagePlus className="w-5 h-5 text-muted-foreground" />
+                          }
                           <input
                             type="file"
                             accept="image/*"
                             className="hidden"
+                            disabled={uploadingImagen}
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) await handleAddImagen(p.id, file);
