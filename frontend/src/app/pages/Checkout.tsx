@@ -28,16 +28,30 @@ type CarritoBackendItem = {
   id: number;
   id_producto: number;
   id_usuario: number;
-  producto: { id: number; nombre: string; descripcion: string };
+  producto: {
+    id: number;
+    nombre: string;
+    descripcion: string;
+    imagenes?: { ruta: string }[];
+    precios?: { id_pais: number; precio: number }[];
+  };
 };
 
-function carritoItemToCartItem(c: CarritoBackendItem): CartItem {
+const PLACEHOLDER_IMG =
+  'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop';
+
+function carritoItemToCartItem(c: CarritoBackendItem, id_pais?: number): CartItem {
+  // Precio según país del usuario — fallback 0 si no existe
+  const precioMatch = id_pais
+    ? c.producto?.precios?.find((p) => p.id_pais === id_pais)
+    : undefined;
+  const precio = precioMatch ? Number(precioMatch.precio) : 0;
+
   return {
-    id: String(c.id),                  // id del carrito — necesario para DELETE
-    title: c.producto?.nombre ?? "Producto",
-    price: 49.99,                      // placeholder hasta conectar tbl_precio
-    image:
-      "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop",
+    id: String(c.id),
+    title: c.producto?.nombre ?? 'Producto',
+    price: precio,
+    image: c.producto?.imagenes?.[0]?.ruta ?? PLACEHOLDER_IMG,
     quantity: 1,
   };
 }
@@ -62,7 +76,9 @@ export function Checkout() {
       .getByUsuario(usuario.id)
       .then((data) => {
         setCartItems(
-          (data as CarritoBackendItem[]).map(carritoItemToCartItem)
+          (data as CarritoBackendItem[]).map((item) =>
+            carritoItemToCartItem(item, usuario.id_pais)
+          )
         );
       })
       .catch((err: unknown) => {
@@ -255,7 +271,7 @@ export function Checkout() {
                                     'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop';
                                 }}
                                 alt={item.title}
-                                className="w-24 h-24 object-cover rounded"
+                                className="w-24 h-24 object-cover object-center rounded flex-shrink-0"
                               />
                               <div className="flex-1">
                                 <h3 className="mb-1">{item.title}</h3>
@@ -331,7 +347,7 @@ export function Checkout() {
                                   <img
                                     src={item.image}
                                     alt={item.title}
-                                    className="w-24 h-24 object-cover rounded grayscale opacity-60"
+                                    className="w-24 h-24 object-cover object-center rounded flex-shrink-0 grayscale opacity-60"
                                   />
                                   <div className="flex-1">
                                     <h3 className="mb-1 line-through text-muted-foreground">

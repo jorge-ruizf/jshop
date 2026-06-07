@@ -40,7 +40,7 @@ export function Login() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="mb-2">Iniciar Sesión</h1>
-          <p className="text-muted-foreground">Accede a tu cuenta de GameStore Pro</p>
+          <p className="text-muted-foreground">Accede a tu cuenta de JShop</p>
           {/* Live Producto count from backend */}
           <p className="mt-2 text-xs text-muted-foreground">
             {productosLoading

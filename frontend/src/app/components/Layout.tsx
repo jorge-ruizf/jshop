@@ -92,7 +92,7 @@ export function Layout() {
                 className="w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
                 <Home className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl tracking-tight">GameStore Pro</span>
+              <span className="text-xl tracking-tight">JShop</span>
             </Link>
 
             {/* Navigation */}
@@ -237,7 +237,7 @@ export function Layout() {
       <footer className="bg-muted border-t border-border mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-sm text-muted-foreground">
-            &copy; 2026 GameStore Pro. Todos los derechos reservados.
+            &copy; 2026 . Todos los derechos reservados.
           </p>
         </div>
       </footer>

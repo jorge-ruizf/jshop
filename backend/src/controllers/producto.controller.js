@@ -75,7 +75,17 @@ export async function updateProducto(req, res, next) {
 
 export async function deleteProducto(req, res, next) {
   try {
-    await prisma.producto.delete({ where: { id: req.id } });
+    const id = req.id;
+
+    // Eliminar dependientes en orden (respetar FKs)
+    await prisma.carrito.deleteMany({ where: { id_producto: id } });
+    await prisma.precio.deleteMany({ where: { id_producto: id } });
+    await prisma.imagen_Producto.deleteMany({ where: { id_producto: id } });
+    await prisma.producto_Deseado.deleteMany({ where: { id_producto: id } });
+    // venta_x_producto: NO eliminar — afecta historial de ventas
+    // Si hay venta_x_productos vinculados, el delete fallará — aceptable para MVP
+
+    await prisma.producto.delete({ where: { id } });
     res.status(204).end();
   } catch (err) { next(err); }
 }

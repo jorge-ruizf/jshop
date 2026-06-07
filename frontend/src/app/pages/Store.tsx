@@ -194,7 +194,7 @@ export function Store() {
       <div className="bg-gradient-to-r from-primary via-secondary to-accent py-16 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl mb-4 text-white">
-            Bienvenido a GameStore Pro
+            Bienvenido a JShop
           </h1>
           <p className="text-xl text-white/90 max-w-2xl mx-auto">
             Descubre los mejores videojuegos para todas las plataformas
