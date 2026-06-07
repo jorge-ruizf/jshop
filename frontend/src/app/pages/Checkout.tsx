@@ -201,17 +201,18 @@ export function Checkout() {
   const getGameStock = (_gameId: string): "unlimited" | number => "unlimited";
   const getGameSeller = (_gameId: string) => undefined;
 
+  {/**aqui */ }
   if (authLoading || productosLoading)
-    return <p>Cargando carrito...</p>;
+    return <div className="flex items-center text-sm text-muted-foreground"><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cargando carrito...</div>;
 
   if (!usuario)
-    return <p>Debes iniciar sesión.</p>;
+    return <div className="flex items-center text-sm text-muted-foreground">Debes iniciar sesión.</div>;
 
   if (productosError)
-    return <p>Error cargando carrito.</p>;
+    return <div className="flex items-center text-sm text-destructive">Error cargando carrito.</div>;
 
   if (cartItems.length === 0)
-    return <p>Tu carrito está vacío.</p>;
+    return <div className="flex items-center text-sm text-muted-foreground">Tu carrito está vacío.</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-8">

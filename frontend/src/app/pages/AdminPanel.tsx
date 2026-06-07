@@ -20,28 +20,11 @@ import {
 
 import type { Pais, Videojuego, MetodoPago, Producto, Usuario } from "../services/types";
 import {
-  Plus,
-  Upload,
-  Gamepad2,
-  Globe,
-  Tag,
-  Wallet,
-  Percent,
-  Pencil,
-  Trash2,
-  Archive,
-  ArchiveRestore,
-  Infinity,
-  Package,
-  X,
-  Check,
-  Users,
-  Search,
-  Star,
-  UserPlus,
-  Loader2,
+  Plus, Upload, Gamepad2, Globe, Tag, Wallet, Percent,
+  Pencil, Trash2, Archive, ArchiveRestore, Infinity,
+  Package, X, Check, Users, Search, Star, UserPlus,
+  Loader2, ImagePlus,
 } from "lucide-react";
-
 // ─── Reusable sub-tab component ─────────────────────────────────────────
 function SubTabs({
   tabs,
@@ -117,6 +100,12 @@ function ProductsSection() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editCategoryId, setEditCategoryId] = useState("");
+  const [editPaisId, setEditPaisId] = useState("");
+  const [editVideojuegoId, setEditVideojuegoId] = useState("");
+  const [editVendedorId, setEditVendedorId] = useState("");
+  const [editPrices, setEditPrices] = useState<Record<string, string>>({});
+  const [editImagenes, setEditImagenes] = useState<{ id: number; ruta: string }[]>([]);
   const { loading: mutating, error: mutationError, mutate } = useMutation();
   const [prices, setPrices] = useState<Record<string, string>>({});
 
@@ -171,58 +160,110 @@ function ProductsSection() {
   };
 
   const handleAdd = (e: React.FormEvent) => {
-  e.preventDefault();
-  mutate(async () => {
-    const nuevo = await productosService.create({
-      nombre: title.trim(),
-      descripcion: description.trim(),
-      id_categoria: Number(categoryId),
-      id_pais: Number(paisId),
-      id_videojuego: Number(videojuegoId),
-      id_vendedor: Number(vendedorId) || 0,
-    });
+    e.preventDefault();
+    mutate(async () => {
+      const nuevo = await productosService.create({
+        nombre: title.trim(),
+        descripcion: description.trim(),
+        id_categoria: Number(categoryId),
+        id_pais: Number(paisId),
+        id_videojuego: Number(videojuegoId),
+        id_vendedor: Number(vendedorId) || 0,
+      });
 
-    const preciosPayload = Object.entries(prices)
-      .filter(([, valor]) => valor !== '' && Number(valor) >= 0)
-      .map(([id_pais, precio]) => ({
-        id_pais: Number(id_pais),
-        precio: Number(precio),
-      }));
+      const preciosPayload = Object.entries(prices)
+        .filter(([, valor]) => valor !== '' && Number(valor) >= 0)
+        .map(([id_pais, precio]) => ({
+          id_pais: Number(id_pais),
+          precio: Number(precio),
+        }));
 
-    if (preciosPayload.length > 0) {
-      await preciosService.bulk(nuevo.id, preciosPayload);
-    }
-
-    if (imageFile) {
-      try {
-        const publicUrl = await storageService.uploadFile(nuevo.id, imageFile);
-        await productosService.addImagen(nuevo.id, publicUrl);
-      } catch (err) {
-        console.warn('Imagen no guardada:', err);
+      if (preciosPayload.length > 0) {
+        await preciosService.bulk(nuevo.id, preciosPayload);
       }
-    }
 
-    resetForm();
-    refreshProductos();
-  });
-};
+      if (imageFile) {
+        try {
+          const publicUrl = await storageService.uploadFile(nuevo.id, imageFile);
+          await productosService.addImagen(nuevo.id, publicUrl);
+        } catch (err) {
+          console.warn('Imagen no guardada:', err);
+        }
+      }
 
-  const startEdit = (p: Producto) => {
+      resetForm();
+      refreshProductos();
+    });
+  };
+
+
+  const startEdit = (p: any) => {
     setEditingId(p.id);
     setEditTitle(p.nombre);
     setEditDesc(p.descripcion);
+    setEditCategoryId(String(p.id_categoria));
+    setEditPaisId(String(p.id_pais));
+    setEditVideojuegoId(String(p.id_videojuego ?? ""));
+    setEditVendedorId(String(p.id_vendedor ?? ""));
+    // Precios existentes → Record<id_pais, precio>
+    const preciosMap: Record<string, string> = {};
+    (p.precios ?? []).forEach((pr: any) => {
+      preciosMap[String(pr.id_pais)] = String(pr.precio);
+    });
+    setEditPrices(preciosMap);
+    // Imágenes existentes
+    setEditImagenes((p.imagenes ?? []).map((img: any) => ({ id: img.id, ruta: img.ruta })));
   };
+
+  const cancelEdit = () => setEditingId(null);
 
   const saveEdit = () => {
     if (editingId === null) return;
     mutate(async () => {
+      // 1. Actualizar campos base
       await productosService.update(editingId, {
         nombre: editTitle.trim(),
         descripcion: editDesc.trim(),
+        id_categoria: Number(editCategoryId),
+        id_pais: Number(editPaisId),
+        id_videojuego: Number(editVideojuegoId),
+        id_vendedor: Number(editVendedorId) || 0,
       });
+
+      // 2. Actualizar precios
+      const preciosPayload = Object.entries(editPrices)
+        .filter(([, v]) => v !== '' && Number(v) >= 0)
+        .map(([id_pais, precio]) => ({ id_pais: Number(id_pais), precio: Number(precio) }));
+      if (preciosPayload.length > 0) {
+        await preciosService.bulk(editingId, preciosPayload);
+      }
+
       setEditingId(null);
       refreshProductos();
     });
+  };
+
+  const handleDeleteImagen = async (imagenId: number) => {
+    try {
+      await fetch(`${(await import('../services/api')).API_URL}/imagenes-producto/${imagenId}`, {
+        method: 'DELETE',
+      });
+      setEditImagenes((prev) => prev.filter((img) => img.id !== imagenId));
+    } catch (err) {
+      console.error('Error eliminando imagen:', err);
+    }
+  };
+
+  const handleAddImagen = async (productoId: number, file: File) => {
+    try {
+      const publicUrl = await storageService.uploadFile(productoId, file);
+      await productosService.addImagen(productoId, publicUrl);
+      // Refrescar imágenes localmente
+      setEditImagenes((prev) => [...prev, { id: Date.now(), ruta: publicUrl }]);
+      refreshProductos();
+    } catch (err) {
+      console.error('Error agregando imagen:', err);
+    }
   };
 
   const handleDelete = (id: number) => {
@@ -463,105 +504,213 @@ function ProductsSection() {
           ) : !productos || productos.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">No hay productos</p>
           ) : (
-            productos.map((p) => {
-              const seller = (usuarios ?? []).find((u) => u.id === p.id_vendedor);
-              return (
-                <div
-                  key={p.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
-                >
+            productos.map((p: any) => (
+              <div key={p.id} className="rounded-lg border bg-muted/10 overflow-hidden">
+
+                {/* ── Fila resumen ── */}
+                <div className="flex items-center gap-3 p-3 hover:bg-muted/20 transition-colors">
                   <img
-                    src="https://images.unsplash.com/photo-1542751371-adc38448a05e?w=56&h=56&fit=crop"
+                    src={p.imagenes?.[0]?.ruta ?? 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=56&h=56&fit=crop'}
                     alt={p.nombre}
-                    className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=56&h=56&fit=crop';
+                    }}
+                    className="w-14 h-14 rounded-lg object-cover object-center flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    {editingId === p.id ? (
-                      <div className="space-y-2">
-                        <Input
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          className="h-8"
-                          disabled={mutating}
-                        />
-                        <Input
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          className="h-8"
-                          disabled={mutating}
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <p className="truncate">{p.nombre}</p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            Cat: {p.id_categoria}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            Stock: ∞ {/* TODO: real stock */}
-                          </span>
-                          {seller && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              @{seller.usuario}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    )}
+                    <p className="truncate">{p.nombre}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-xs">
+                        {(categorias ?? []).find((c) => c.id === p.id_categoria)?.nombre ?? `Cat ${p.id_categoria}`}
+                      </Badge>
+                      {(usuarios ?? []).find((u) => u.id === p.id_vendedor) && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          @{(usuarios ?? []).find((u) => u.id === p.id_vendedor)?.usuario}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {editingId === p.id ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={saveEdit}
-                          disabled={mutating}
-                        >
-                          <Check className="w-4 h-4 text-accent" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setEditingId(null)}
-                          disabled={mutating}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => startEdit(p)}
-                          disabled={mutating}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleDelete(p.id)}
-                          disabled={mutating}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      variant="ghost" size="icon" className="h-8 w-8"
+                      onClick={() => editingId === p.id ? cancelEdit() : startEdit(p)}
+                      disabled={mutating}
+                    >
+                      {editingId === p.id
+                        ? <X className="w-3.5 h-3.5" />
+                        : <Pencil className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button
+                      variant="ghost" size="icon" className="h-8 w-8"
+                      onClick={() => handleDelete(p.id)}
+                      disabled={mutating}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                    </Button>
                   </div>
                 </div>
-              );
-            })
+
+                {/* ── Panel de edición expandido ── */}
+                {editingId === p.id && (
+                  <div className="border-t border-border px-4 pb-4 pt-3 space-y-4 bg-background">
+
+                    {/* Nombre y descripción */}
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-sm">Nombre</Label>
+                        <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} disabled={mutating} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Descripción</Label>
+                        <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} disabled={mutating} />
+                      </div>
+                    </div>
+
+                    {/* Selects */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-sm">Categoría</Label>
+                        <select
+                          value={editCategoryId}
+                          onChange={(e) => setEditCategoryId(e.target.value)}
+                          disabled={mutating}
+                          className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {(categorias ?? []).map((c) => (
+                            <option key={c.id} value={c.id}>{c.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">País</Label>
+                        <select
+                          value={editPaisId}
+                          onChange={(e) => setEditPaisId(e.target.value)}
+                          disabled={mutating}
+                          className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {(paises ?? []).map((p) => (
+                            <option key={p.id} value={p.id}>{p.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Videojuego</Label>
+                        <select
+                          value={editVideojuegoId}
+                          onChange={(e) => setEditVideojuegoId(e.target.value)}
+                          disabled={mutating}
+                          className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {(videojuegos ?? []).map((v) => (
+                            <option key={v.id} value={v.id}>{v.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Vendedor</Label>
+                        <select
+                          value={editVendedorId}
+                          onChange={(e) => setEditVendedorId(e.target.value)}
+                          disabled={mutating}
+                          className="flex h-9 w-full rounded-md border border-input bg-input-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <option value="">Sin vendedor</option>
+                          {(usuarios ?? []).map((u) => (
+                            <option key={u.id} value={u.id}>@{u.usuario} — {u.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Precios por país */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Precios por País</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(paises ?? []).map((pais) => (
+                          <div key={pais.id} className="space-y-0.5">
+                            <Label className="text-xs text-muted-foreground">{pais.nombre}</Label>
+                            <Input
+                              type="number" step="0.01" min="0"
+                              value={editPrices[String(pais.id)] ?? ''}
+                              onChange={(e) => setEditPrices({ ...editPrices, [String(pais.id)]: e.target.value })}
+                              placeholder="0.00"
+                              disabled={mutating}
+                              className="h-8"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Tira de imágenes */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Imágenes</Label>
+                      <div className="flex gap-2 flex-wrap">
+                        {editImagenes.map((img) => (
+                          <div key={img.id} className="relative group w-14 h-14 flex-shrink-0">
+                            <img
+                              src={img.ruta}
+                              alt="imagen"
+                              className="w-14 h-14 rounded-lg object-cover object-center"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src =
+                                  'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=56&h=56&fit=crop';
+                              }}
+                            />
+                            {/* Overlay con botón delete */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteImagen(img.id)}
+                              className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 className="w-4 h-4 text-white" />
+                            </button>
+                          </div>
+                        ))}
+
+                        {/* Botón agregar imagen */}
+                        <label className="w-14 h-14 flex-shrink-0 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary hover:bg-muted/30 transition-colors">
+                          <ImagePlus className="w-5 h-5 text-muted-foreground" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) await handleAddImagen(p.id, file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Botones guardar/cancelar */}
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        type="button"
+                        onClick={saveEdit}
+                        disabled={mutating}
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        {mutating ? 'Guardando…' : 'Guardar cambios'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={cancelEdit} disabled={mutating}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </div>
       )}
+
     </>
   );
 }
