@@ -100,22 +100,24 @@ export function Layout() {
               <Link
                 to="/"
                 className={`transition-colors ${isActive("/")
-                    ? "text-primary"
-                    : "text-foreground hover:text-primary"
+                  ? "text-primary"
+                  : "text-foreground hover:text-primary"
                   }`}
               >
                 Tienda
               </Link>
-              <Link
-                to="/admin"
-                className={`transition-colors flex items-center gap-1 ${isActive("/admin")
+              {usuario?.id_rol === 3 && (
+                <Link
+                  to="/admin"
+                  className={`transition-colors flex items-center gap-1 ${isActive("/admin")
                     ? "text-primary"
                     : "text-foreground hover:text-primary"
-                  }`}
-              >
-                <Shield className="w-4 h-4" />
-                Admin
-              </Link>
+                    }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  Admin
+                </Link>
+              )}
             </nav>
 
             {/* Actions */}

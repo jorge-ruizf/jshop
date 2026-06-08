@@ -5,8 +5,9 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { AdminExpandableCard } from "../components/AdminExpandableCard";
-//import { useFetch } from "../hooks/useFetch";
 import { useFetch } from '../hooks';
+import { Navigate } from "react-router";
+import { useAuthContext } from "../contexts/AuthContext";
 import {
   productosService,
   categoriasService,
@@ -1606,184 +1607,234 @@ function OffersSection() {
 }
 
 // ─── SELLERS SECTION ────────────────────────────────────────────────────
-function SellersSection() {
+function AdminsSection() {
+  const [tab, setTab] = useState("agregar");
+  const [search, setSearch] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editNombre, setEditNombre] = useState("");
+  const [editUsuario, setEditUsuario] = useState("");
+  const { loading: mutating, error: mutationError, mutate } = useMutation();
+
   const {
     data: usuarios,
-    loading,
-    error,
+    loading: usuariosLoading,
+    refresh: refreshUsuarios,
   } = useFetch((signal) => usuariosService.list(signal), []);
 
-  const [tab, setTab] = useState("manage");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sellerSearch, setSellerSearch] = useState("");
-  // TODO: Replace with real vendedores endpoint when available
-  const [sellerIds, setSellerIds] = useState<number[]>([]);
+  const admins = (usuarios ?? []).filter((u) => u.id_rol === 3);
+  const usuariosNormales = (usuarios ?? []).filter((u) => u.id_rol !== 3);
 
-  const sellers: Usuario[] = (usuarios ?? []).filter((u) => sellerIds.includes(u.id));
-  const pool: Usuario[] = (usuarios ?? []).filter((u) => !sellerIds.includes(u.id));
-
-  const filteredPool = pool.filter(
+  const filteredAdmins = admins.filter(
     (u) =>
-      u.usuario.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.nombre.toLowerCase().includes(searchQuery.toLowerCase()),
+      u.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      u.usuario.toLowerCase().includes(search.toLowerCase())
   );
 
-  const filteredSellers = sellers.filter(
-    (s) =>
-      s.usuario.toLowerCase().includes(sellerSearch.toLowerCase()) ||
-      s.nombre.toLowerCase().includes(sellerSearch.toLowerCase()),
+  const filteredUsuarios = usuariosNormales.filter(
+    (u) =>
+      u.nombre.toLowerCase().includes(search.toLowerCase()) ||
+      u.usuario.toLowerCase().includes(search.toLowerCase())
   );
 
-  const getProductCount = (vendedorId: number) =>
-    0; // TODO: real count when backend supports it
+  const promoverAdmin = (u: Usuario) => {
+    mutate(async () => {
+      await usuariosService.update(u.id, { id_rol: 3 });
+      refreshUsuarios();
+    });
+  };
+
+  const startEdit = (u: Usuario) => {
+    setEditingId(u.id);
+    setEditNombre(u.nombre);
+    setEditUsuario(u.usuario);
+  };
+
+  const saveEdit = () => {
+    if (!editingId) return;
+    mutate(async () => {
+      await usuariosService.update(editingId, {
+        nombre: editNombre.trim(),
+        usuario: editUsuario.trim(),
+      });
+      setEditingId(null);
+      refreshUsuarios();
+    });
+  };
+
+  const quitarAdmin = (u: Usuario) => {
+    mutate(async () => {
+      await usuariosService.update(u.id, { id_rol: 1 });
+      refreshUsuarios();
+    });
+  };
 
   return (
     <>
       <SubTabs
         tabs={[
-          { key: "manage", label: "Vendedores" },
-          { key: "add", label: "Agregar" },
+          { key: "agregar", label: "Agregar admin" },
+          { key: "editar", label: "Administradores" },
         ]}
         active={tab}
         onChange={setTab}
       />
 
-      {tab === "add" && (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-6 text-muted-foreground">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Cargando usuarios…
-            </div>
-          ) : error ? (
-            <p className="text-center py-6 text-destructive">
-              No se pudieron cargar los usuarios: {error.message}
-            </p>
-          ) : (
-            <>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar usuario por username o nombre..."
-                  className="pl-9"
-                />
-              </div>
-
-              {searchQuery.trim() === "" ? (
-                <p className="text-center py-6 text-muted-foreground text-sm">
-                  Escribe un username para buscar usuarios disponibles
-                </p>
-              ) : filteredPool.length === 0 ? (
-                <p className="text-center py-6 text-muted-foreground text-sm">
-                  No se encontraron usuarios con ese nombre, o ya son vendedores
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredPool.map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
-                    >
-                      <img
-                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nombre)}&size=40`}
-                        alt={u.nombre}
-                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate">{u.nombre}</p>
-                        <p className="text-xs text-muted-foreground">@{u.usuario}</p>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => setSellerIds((prev) => [...prev, u.id])}
-                        className="bg-primary hover:bg-primary/90 flex-shrink-0"
-                      >
-                        <UserPlus className="w-4 h-4 mr-1" />
-                        Agregar
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+      {mutationError && (
+        <p className="text-sm text-destructive mb-3">{mutationError}</p>
       )}
 
-      {tab === "manage" && (
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={sellerSearch}
-              onChange={(e) => setSellerSearch(e.target.value)}
-              placeholder="Filtrar vendedores..."
-              className="pl-9"
-            />
-          </div>
+      {/* Buscador compartido */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder={tab === "agregar" ? "Buscar usuario..." : "Buscar admin..."}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 h-9"
+        />
+      </div>
 
-          {filteredSellers.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">
-              {sellers.length === 0
-                ? "No hay vendedores registrados. Usa «Agregar» para añadir uno."
-                : "No se encontraron vendedores con ese nombre."}
+      {/* TAB: Agregar admin */}
+      {tab === "agregar" && (
+        <div className="space-y-2">
+          {usuariosLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Cargando usuarios…
+            </div>
+          ) : filteredUsuarios.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay usuarios disponibles para promover.
             </p>
           ) : (
-            <div className="max-h-[864px] overflow-y-auto space-y-2 pr-1">
-              {filteredSellers.map((s) => (
+            <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+              {filteredUsuarios.map((u) => (
                 <div
-                  key={s.id}
+                  key={u.id}
                   className="flex items-center gap-3 p-3 rounded-lg border bg-muted/10 hover:bg-muted/30 transition-colors"
                 >
                   <img
-                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(s.nombre)}&size=48`}
-                    alt={s.nombre}
-                    className="w-12 h-12 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
+                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nombre)}&size=48`}
+                    alt={u.nombre}
+                    className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="truncate">{s.nombre}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">@{s.usuario}</p>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      {/* TODO: real rating from backend */}
-                      <span className="text-xs text-muted-foreground">
-                        Sin calificaciones aún
-                      </span>
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Package className="w-3 h-3" />
-                        {getProductCount(s.id)} productos
-                      </span>
-                    </div>
+                    <p className="text-sm font-medium truncate">{u.nombre}</p>
+                    <p className="text-xs text-muted-foreground">@{u.usuario}</p>
+                    <p className="text-xs text-muted-foreground truncate">{u.correo}</p>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        setSellerIds((prev) => prev.filter((id) => id !== s.id))
-                      }
-                      title="Quitar como vendedor"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={mutating}
+                    onClick={() => promoverAdmin(u)}
+                    className="flex-shrink-0 text-xs"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 mr-1" />
+                    Hacer admin
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-
           <p className="text-xs text-muted-foreground text-center pt-1">
-            {filteredSellers.length}{" "}
-            {filteredSellers.length === 1 ? "vendedor" : "vendedores"}
-            {sellers.length !== filteredSellers.length &&
-              ` de ${sellers.length}`}
+            {filteredUsuarios.length} {filteredUsuarios.length === 1 ? "usuario" : "usuarios"}
           </p>
-          <p className="text-xs text-muted-foreground text-center">
-            TODO: Conectar con endpoint de vendedores cuando esté disponible
+        </div>
+      )}
+
+      {/* TAB: Editar / eliminar admins */}
+      {tab === "editar" && (
+        <div className="space-y-2">
+          {usuariosLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-4 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Cargando administradores…
+            </div>
+          ) : filteredAdmins.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No hay administradores registrados.
+            </p>
+          ) : (
+            <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+              {filteredAdmins.map((u) => (
+                <div
+                  key={u.id}
+                  className="rounded-lg border bg-muted/10 overflow-hidden"
+                >
+                  {editingId === u.id ? (
+                    /* Modo edición */
+                    <div className="p-3 space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nombre</Label>
+                        <Input
+                          value={editNombre}
+                          onChange={(e) => setEditNombre(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Usuario</Label>
+                        <Input
+                          value={editUsuario}
+                          onChange={(e) => setEditUsuario(e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={saveEdit} disabled={mutating} className="flex-1">
+                          <Check className="w-3.5 h-3.5 mr-1" /> Guardar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)} className="flex-1">
+                          <X className="w-3.5 h-3.5 mr-1" /> Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Modo vista */
+                    <div className="flex items-center gap-3 p-3">
+                      <img
+                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(u.nombre)}&size=48`}
+                        alt={u.nombre}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0 ring-1 ring-border"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{u.nombre}</p>
+                          <Badge variant="outline" className="text-xs px-1.5 py-0 border-amber-400 text-amber-600">
+                            Admin
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">@{u.usuario}</p>
+                        <p className="text-xs text-muted-foreground truncate">{u.correo}</p>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => startEdit(u)}
+                          title="Editar administrador"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => quitarAdmin(u)}
+                          disabled={mutating}
+                          title="Quitar rol de administrador"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground text-center pt-1">
+            {filteredAdmins.length} {filteredAdmins.length === 1 ? "administrador" : "administradores"}
           </p>
         </div>
       )}
@@ -1793,6 +1844,10 @@ function SellersSection() {
 
 // ─── MAIN ADMIN PANEL ───────────────────────────────────────────────────
 export function AdminPanel() {
+  const { usuario } = useAuthContext();
+
+  if (!usuario) return <Navigate to="/login" />;
+  if (usuario.id_rol !== 3) return <Navigate to="/" />;
   const {
     data: backendProductos,
     loading: backendProductosLoading,
@@ -1875,11 +1930,11 @@ export function AdminPanel() {
 
           <AdminExpandableCard
             icon={<Users className="w-5 h-5" />}
-            title="Vendedores"
-            subtitle="Gestiona los vendedores asociados a los productos"
+            title="Administradores"
+            subtitle="Gestiona los administradores del sistema"
             accentColor="bg-amber-500/10 text-amber-600"
           >
-            <SellersSection />
+            <AdminsSection/>
           </AdminExpandableCard>
 
           {/* <AdminExpandableCard
@@ -1950,7 +2005,7 @@ export function AdminPanel() {
             <li>• Los elementos archivados no serán visibles para los clientes</li>
             <li>• Eliminar es permanente, archivar es reversible</li>
             <li>• El stock ilimitado indica productos fácilmente renovables</li>
-            <li>• Los vendedores archivados siguen vinculados a sus productos</li>
+            <li>• Quitar el rol de admin devuelve al usuario a rol normal sin eliminar su cuenta</li>
           </ul>
         </div>
       </div>

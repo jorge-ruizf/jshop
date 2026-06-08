@@ -54,7 +54,7 @@ export async function enviarAlertaPrecio({ to, nombreProducto, precioActual, pre
                     </tr>
                   </table>
 
-                  <a href="${process.env.FRONTEND_URL ?? 'http://localhost:5173'}"
+                  <a href="${process.env.FRONTEND_URL ?? 'https://jshop-kappa.vercel.app' ?? 'http://localhost:5173'}"
                     style="display:inline-block;background:#6d28d9;color:#fff;padding:12px 28px;
                     border-radius:8px;text-decoration:none;font-size:14px;font-weight:500">
                     Ver en JShop →
