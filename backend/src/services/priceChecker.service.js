@@ -98,3 +98,5 @@ export function iniciarPriceChecker() {
 
   cron.schedule(schedule, verificarPrecios);
 }
+
+export { verificarPrecios };
