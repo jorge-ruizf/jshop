@@ -234,18 +234,18 @@ export function Checkout() {
               <h2 className="mb-4">Productos en el Carrito</h2>
               <div className="space-y-4">
                 {productosLoading ? (
-                  <div className="flex items-center justify-center py-8 text-muted-foreground">
+                  <div className="min-h-screen flex items-center justify-center text-muted-foreground">
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Cargando productos…
                   </div>
                 ) : productosError ? (
-                  <p className="text-center py-8 text-destructive">
+                  <div className="min-h-screen flex items-center justify-center  text-destructive">
                     No se pudieron cargar los productos: {getErrorMessage(productosError)}
-                  </p>
+                  </div>
                 ) : cartItems.length === 0 ? (
-                  <p className="text-center py-8 text-muted-foreground">
+                  <div className="min-h-screen flex items-center justify-center text-muted-foreground">
                     Tu carrito está vacío
-                  </p>
+                  </div>
                 ) : (
                   <>
                     {/* Active Items */}
