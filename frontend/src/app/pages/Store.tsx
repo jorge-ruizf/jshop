@@ -15,6 +15,7 @@ import { productosDeseadosService } from "../services/productosDeseados.service"
 import type { ProductoDeseado } from "../services/types.ts";
 import { PriceAlertModal } from "../components/PriceAlertModal";
 import { PriceAlertButton } from "../components/PriceAlertButton";
+import { formatPrecio } from "../utils/formatPrecio";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "xs" }) {
@@ -203,12 +204,13 @@ export function Store() {
     }
   };
 
-  const getPrecio = (producto: Producto): string => {
-    if (!usuario?.id_pais || !producto.precios?.length) return '—';
+  const getPrecioNum = (producto: Producto): number | null => {
+    if (!usuario?.id_pais || !producto.precios?.length) return null;
     const match = producto.precios.find((p) => p.id_pais === usuario.id_pais);
-    if (!match) return '—';
-    return `$${Number(match.precio).toFixed(2)}`;
+    if (!match || Number(match.precio) <= 0) return null;
+    return Number(match.precio);
   };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -261,11 +263,14 @@ export function Store() {
             {filteredProductos.map((producto) => {
               const alertaExistente = alertasMap.get(producto.id);
               const tieneAlerta = !!alertaExistente;
+              const precioNum = getPrecioNum(producto);
+              const noDisponible = precioNum === null;
 
               return (
                 <Card
                   key={producto.id}
-                  className="overflow-hidden hover:shadow-lg transition-shadow group"
+                  className="overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer"
+                  onClick={() => navigate(`/producto/${producto.id}`)}
                 >
                   <div className="relative overflow-hidden">
                     <img
@@ -274,21 +279,15 @@ export function Store() {
                         'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
                       }
                       alt={producto.nombre}
-                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      className={`w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 ${noDisponible ? "grayscale brightness-75" : ""
+                        }`}
                     />
-                    <PriceAlertButton
-                      alertaExistente={alertasMap.get(producto.id)}
-                      onClick={() => setModalProducto(producto)}
-                    />
-                    <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
-
-                    {/* Indicador de alerta activa sobre la imagen */}
-                    {tieneAlerta && (
-                      <div className="absolute top-2 left-2 bg-primary/90 text-primary-foreground rounded-full p-1"
-                        title="Tienes una alerta de precio activa">
-                        <Bell className="w-3 h-3" />
-                      </div>
+                    {noDisponible && (
+                      <span className="absolute bottom-2 left-2 bg-destructive text-destructive-foreground text-[10px] font-medium px-2 py-0.5 rounded-full">
+                        No disponible
+                      </span>
                     )}
+                    <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
                   </div>
 
                   <div className="p-4">
@@ -301,17 +300,26 @@ export function Store() {
                     <div className="flex items-center gap-1.5 mb-3">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Package className="w-3.5 h-3.5" />
-                        ID #{producto.id}
+                        {producto.imagenes?.length
+                          ? `${producto.imagenes.length} ${producto.imagenes.length === 1 ? "imagen" : "imágenes"}`
+                          : "Sin imágenes"}
+                        {"  ·  "}
+                        {noDisponible ? "Sin stock" : "Disponible"}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xl text-primary">{getPrecio(producto)}</span>
+                      <span className={`text-xl ${noDisponible ? "text-muted-foreground" : "text-primary"}`}>
+                        {noDisponible ? "—" : formatPrecio(precioNum!)}
+                      </span>
                       <Button
                         size="sm"
-                        onClick={() => handleAgregar(producto.id)}
-                        disabled={agregando === producto.id}
-                        className="bg-secondary hover:bg-secondary/90"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAgregar(producto.id);
+                        }}
+                        disabled={agregando === producto.id || noDisponible}
+                        className="bg-secondary hover:bg-secondary/90 disabled:opacity-50"
                       >
                         <ShoppingCart className="w-4 h-4 mr-1" />
                         {agregando === producto.id ? "Agregando..." : "Agregar"}
@@ -327,7 +335,10 @@ export function Store() {
                           ? "border-primary/40 text-primary hover:bg-primary/5"
                           : "text-muted-foreground"
                           }`}
-                        onClick={() => setModalProducto(producto)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalProducto(producto);
+                        }}
                       >
                         <Bell className={`w-3.5 h-3.5 mr-1.5 ${tieneAlerta ? "fill-primary/20" : ""}`} />
                         {tieneAlerta
