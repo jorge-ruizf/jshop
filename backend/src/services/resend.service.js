@@ -17,7 +17,7 @@ export async function enviarAlertaPrecio({ to, nombreProducto, precioActual, pre
 
   const { data, error } = await resend.emails.send({
     from: FROM,
-    to,
+    to: process.env.RESEND_TEST_TO ?? to, // para pruebas, redirige a un email fijo
     subject: `¡Bajó el precio! ${nombreProducto} ya está en ${fmt(precioActual)}`,
     html: `
       <!DOCTYPE html>
