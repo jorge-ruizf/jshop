@@ -83,3 +83,21 @@ export interface CarritoItem {
   id_producto: number;
   id_usuario: number;
 }
+
+ 
+export interface Notificacion {
+  id: number;
+  fecha_notificado: string;
+  descripcion: string;
+  id_producto_deseado: number;
+}
+ 
+export interface ProductoDeseado {
+  id: number;
+  precio_objetivo: number;
+  id_producto: number;
+  id_usuario: number;
+  producto?: import('./types').Producto;
+  notificaciones?: Notificacion[];
+}
+ 

@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
-import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2 } from "lucide-react";
+import { ShoppingCart, Package, Star, ArrowLeft, Users, Loader2, Bell } from "lucide-react";
 import { useStore } from "../data/store-context";
 import { useFetch } from "../hooks";
 import { productosService, categoriasService } from "../services";
@@ -11,6 +11,10 @@ import type { Seller } from "../data/games";
 import { carritoService } from "../services/carrito.service";
 import { useAuthContext } from "../contexts/AuthContext";
 import type { Producto } from "../services/types";
+import { productosDeseadosService } from "../services/productosDeseados.service";
+import type { ProductoDeseado } from "../services/types.ts";
+import { PriceAlertModal } from "../components/PriceAlertModal";
+import { PriceAlertButton } from "../components/PriceAlertButton";
 
 // ─── Star Rating display ─────────────────────────────────────────────────
 function StarRating({ rating, size = "sm" }: { rating: number; size?: "sm" | "xs" }) {
@@ -142,14 +146,40 @@ export function Store() {
   const { usuario } = useAuthContext();
   const [agregando, setAgregando] = useState<number | null>(null);
 
-  // Fetch real products from the backend via the service layer.
+  // ── Alertas de precio ─────────────────────────────────────────────────
+  // Map de id_producto → ProductoDeseado (alerta existente del usuario)
+  const [alertasMap, setAlertasMap] = useState<Map<number, ProductoDeseado>>(new Map());
+  // Modal: producto seleccionado para crear/editar alerta
+  const [modalProducto, setModalProducto] = useState<Producto | null>(null);
+
+  // Cargar alertas existentes del usuario al montar
+  useEffect(() => {
+    if (!usuario?.id) return;
+    productosDeseadosService.listar(usuario.id).then((alertas) => {
+      const map = new Map<number, ProductoDeseado>();
+      for (const a of alertas) map.set(a.id_producto, a);
+      setAlertasMap(map);
+    }).catch(() => {
+      // silencioso — no bloquea la store si falla
+    });
+  }, [usuario?.id]);
+
+  const handleAlertaSuccess = (productoId: number, alerta: ProductoDeseado | null) => {
+    setAlertasMap((prev) => {
+      const next = new Map(prev);
+      if (alerta === null) next.delete(productoId);
+      else next.set(productoId, alerta);
+      return next;
+    });
+  };
+  // ─────────────────────────────────────────────────────────────────────
+
   const {
     data: productos,
     loading,
     error,
   } = useFetch((signal) => productosService.list(signal), []);
 
-  // Fetch real Categorias from the backend.
   const {
     data: categorias,
     loading: categoriasLoading,
@@ -158,16 +188,8 @@ export function Store() {
 
   const activeCategories = store.getActiveCategories();
   const selectedSeller = selectedSellerId ? store.getSeller(selectedSellerId) : null;
-
   const filteredProductos = productos ?? [];
-
-  const clearSellerFilter = () => {
-    setSelectedSellerId(null);
-  };
-
-  const addToCart = (_productoId: number) => {
-    navigate("/checkout");
-  };
+  const clearSellerFilter = () => setSelectedSellerId(null);
 
   const handleAgregar = async (id_producto: number) => {
     if (!usuario) return;
@@ -203,7 +225,6 @@ export function Store() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Seller Banner (when filtering by seller) */}
         {selectedSeller && (
           <SellerBanner
             seller={selectedSeller}
@@ -212,53 +233,6 @@ export function Store() {
           />
         )}
 
-        {/* Category Filter (hidden when filtering by seller) */}
-        {!selectedSellerId && (
-          <div className="mb-8">
-            <h2 className="mb-4">Categorías</h2>
-            {categoriasLoading ? (
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Cargando categorías…
-              </div>
-            ) : categoriasError ? (
-              <p className="text-sm text-destructive">
-                No se pudieron cargar las categorías: {categoriasError.message}
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedCategory === "Todos" ? "default" : "outline"}
-                  onClick={() => setSelectedCategory("Todos")}
-                  className={selectedCategory === "Todos" ? "bg-primary hover:bg-primary/90" : ""}
-                >
-                  Todos
-                </Button>
-                {(categorias ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground self-center">
-                    No hay categorías disponibles
-                  </p>
-                ) : (
-                  (categorias ?? []).map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant={selectedCategory === cat.nombre ? "default" : "outline"}
-                      onClick={() => setSelectedCategory(cat.nombre)}
-                      className={
-                        selectedCategory === cat.nombre ? "bg-primary hover:bg-primary/90" : ""
-                      }
-                    >
-                      {cat.nombre}
-                    </Button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-        {void activeCategories}
-
-        {/* Section title when filtering */}
         {selectedSellerId && (
           <h2 className="mb-6 text-muted-foreground">
             Productos de{" "}
@@ -266,7 +240,6 @@ export function Store() {
           </h2>
         )}
 
-        {/* Loading state */}
         {loading && (
           <div className="flex items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
@@ -274,7 +247,6 @@ export function Store() {
           </div>
         )}
 
-        {/* Error state */}
         {error && !loading && (
           <div className="text-center py-12">
             <p className="text-destructive">
@@ -283,56 +255,91 @@ export function Store() {
           </div>
         )}
 
-        {/* Products Grid (real backend data) */}
+        {/* Products Grid */}
         {!loading && !error && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProductos.map((producto) => (
-              <Card
-                key={producto.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow group"
-              >
-                <div className="relative overflow-hidden">
-                  <img
-                    src={
-                      producto.imagenes?.[0]?.ruta ??
-                      'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
-                    }
-                    alt={producto.nombre}
-                    className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
-                </div>
-                <div className="p-4">
-                  <h3 className="mb-1 line-clamp-1">{producto.nombre}</h3>
+            {filteredProductos.map((producto) => {
+              const alertaExistente = alertasMap.get(producto.id);
+              const tieneAlerta = !!alertaExistente;
 
-                  <p className="text-sm text-muted-foreground mt-2 mb-3 line-clamp-2">
-                    {producto.descripcion}
-                  </p>
+              return (
+                <Card
+                  key={producto.id}
+                  className="overflow-hidden hover:shadow-lg transition-shadow group"
+                >
+                  <div className="relative overflow-hidden">
+                    <img
+                      src={
+                        producto.imagenes?.[0]?.ruta ??
+                        'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
+                      }
+                      alt={producto.nombre}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <PriceAlertButton
+                      alertaExistente={alertasMap.get(producto.id)}
+                      onClick={() => setModalProducto(producto)}
+                    />
+                    <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
 
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Package className="w-3.5 h-3.5" />
-                      ID #{producto.id}
-                    </span>
+                    {/* Indicador de alerta activa sobre la imagen */}
+                    {tieneAlerta && (
+                      <div className="absolute top-2 left-2 bg-primary/90 text-primary-foreground rounded-full p-1"
+                        title="Tienes una alerta de precio activa">
+                        <Bell className="w-3 h-3" />
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl text-primary">{getPrecio(producto)}</span>
-                    <Button
-                      size="sm"
-                      onClick={() => handleAgregar(producto.id)}
-                      disabled={agregando === producto.id}
-                      className="bg-secondary hover:bg-secondary/90"
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-1" />
-                      {agregando === producto.id
-                        ? "Agregando..."
-                        : "Agregar al carrito"}
-                    </Button>
+                  <div className="p-4">
+                    <h3 className="mb-1 line-clamp-1">{producto.nombre}</h3>
+
+                    <p className="text-sm text-muted-foreground mt-2 mb-3 line-clamp-2">
+                      {producto.descripcion}
+                    </p>
+
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Package className="w-3.5 h-3.5" />
+                        ID #{producto.id}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xl text-primary">{getPrecio(producto)}</span>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAgregar(producto.id)}
+                        disabled={agregando === producto.id}
+                        className="bg-secondary hover:bg-secondary/90"
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-1" />
+                        {agregando === producto.id ? "Agregando..." : "Agregar"}
+                      </Button>
+                    </div>
+
+                    {/* ── Botón de alerta de precio ─────────────────── */}
+                    {usuario && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`w-full text-xs ${tieneAlerta
+                          ? "border-primary/40 text-primary hover:bg-primary/5"
+                          : "text-muted-foreground"
+                          }`}
+                        onClick={() => setModalProducto(producto)}
+                      >
+                        <Bell className={`w-3.5 h-3.5 mr-1.5 ${tieneAlerta ? "fill-primary/20" : ""}`} />
+                        {tieneAlerta
+                          ? `Alerta: $${Number(alertaExistente.precio_objetivo).toLocaleString("es-CO")}`
+                          : "Crear alerta de precio"}
+                      </Button>
+                    )}
+                    {/* ─────────────────────────────────────────────── */}
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         )}
 
@@ -352,10 +359,22 @@ export function Store() {
           </div>
         )}
       </div>
+
+      {/* Modal de alerta de precio */}
+      {modalProducto && usuario && (
+        <PriceAlertModal
+          producto={modalProducto}
+          idUsuario={usuario.id}
+          alertaExistente={alertasMap.get(modalProducto.id)}
+          onClose={() => setModalProducto(null)}
+          onSuccess={(alerta) => {
+            handleAlertaSuccess(modalProducto.id, alerta);
+            setModalProducto(null);
+          }}
+        />
+      )}
+
+      {/*void (SellerBadge, selectedCategory, setSelectedCategory, activeCategories, categorias, categoriasLoading, categoriasError)*/}
     </div>
   );
 }
-
-// Note: SellerBadge is intentionally retained (not removed) for future use
-// when the backend exposes seller details on Producto (id_vendedor → Usuario).
-void SellerBadge;

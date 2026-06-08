@@ -18,6 +18,7 @@ import { notificacionRouter } from './notificacion.routes.js';
 import { videojuegoRouter } from './videojuego.routes.js';
 import { pagosRouter } from './pagos.routes.js';
 import { precioRouter } from './precio.routes.js';
+import { productoDeseadoRouter } from './productoDeseado.routes.js'; // ← NUEVO
 
 const apiRouter = Router();
 
@@ -36,6 +37,9 @@ apiRouter.use('/ventas-productos', ventaProductoRouter);
 apiRouter.use('/carrito', carritoRouter);
 apiRouter.use('/precios', precioRouter);
 
+// ALERTAS DE PRECIO ← NUEVO
+apiRouter.use('/productos-deseados', productoDeseadoRouter);
+
 // SOCIAL / CHAT
 apiRouter.use('/chats', chatRouter);
 apiRouter.use('/mensajes', mensajeRouter);
@@ -52,12 +56,8 @@ apiRouter.use('/notificaciones', notificacionRouter);
 // VIDEOJUEGOS
 apiRouter.use('/videojuegos', videojuegoRouter);
 
-
 // PAGOS DISCORD
-apiRouter.use("/pagos", pagosRouter);
-
-export { apiRouter };
-
+apiRouter.use('/pagos', pagosRouter);
 
 apiRouter.get('/', (req, res) => {
   res.json({
@@ -67,6 +67,9 @@ apiRouter.get('/', (req, res) => {
       '/api/categorias',
       '/api/usuarios',
       '/api/ventas',
+      '/api/productos-deseados',
     ],
   });
 });
+
+export { apiRouter };

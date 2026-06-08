@@ -13,3 +13,4 @@ export { carritoService } from "./carrito.service";
 export { pagosService } from "./pagos.service";
 export { storageService } from "./storageService";
 export { preciosService } from './precios.service';
+export { productosDeseadosService } from './productosDeseados.service';
