@@ -13,5 +13,8 @@ ventaRouter.get('/:id', parseId, getVenta);
 ventaRouter.post('/', requireFields(['id_usuario', 'id_metodo_pago', 'total']), createVenta);
 ventaRouter.put('/:id', parseId, updateVenta);
 ventaRouter.delete('/:id', parseId, deleteVenta);
+ventaRouter.post('/confirmar', requireFields(['id_usuario', 'id_metodo_pago', 'total', 'items']), confirmarVenta);
+ 
+
 
 export { ventaRouter };

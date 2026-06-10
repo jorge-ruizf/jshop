@@ -19,6 +19,7 @@ import { videojuegoRouter } from './videojuego.routes.js';
 import { pagosRouter } from './pagos.routes.js';
 import { precioRouter } from './precio.routes.js';
 import { productoDeseadoRouter } from './productoDeseado.routes.js'; // ← NUEVO
+import { ventaRouter } from './venta.routes.js';
 
 const apiRouter = Router();
 
@@ -57,6 +58,7 @@ apiRouter.use('/notificaciones', notificacionRouter);
 apiRouter.use('/videojuegos', videojuegoRouter);
 
 // PAGOS DISCORD
+apiRouter.use('/ventas', ventaRouter);
 apiRouter.use('/pagos', pagosRouter);
 
 apiRouter.get('/', (req, res) => {

@@ -12,11 +12,14 @@ import { useAuthContext } from "../contexts/AuthContext";
 import { carritoService } from "../services/carrito.service";
 import { useFetch } from "../hooks/useFetch";
 import { pagosService } from "../services/pagos.service";
+import { ventasService } from "../services/ventas.service";
 
 
 // Shape used by the existing rendering code below.
 type CartItem = {
-  id: string;       // id del registro tbl_carrito (usado para DELETE)
+  id: string;         // id del registro tbl_carrito (usado para DELETE)
+  id_producto: number; // necesario para confirmar la venta
+  precio: number;      // precio ya resuelto por país (para el payload)
   title: string;
   price: number;
   image: string;
@@ -49,6 +52,8 @@ function carritoItemToCartItem(c: CarritoBackendItem, id_pais?: number): CartIte
 
   return {
     id: String(c.id),
+    id_producto: c.id_producto,
+    precio,
     title: c.producto?.nombre ?? 'Producto',
     price: precio,
     image: c.producto?.imagenes?.[0]?.ruta ?? PLACEHOLDER_IMG,
@@ -552,31 +557,36 @@ export function Checkout() {
               className="w-full mt-6"
               onClick={async () => {
                 try {
-                  const metodoSeleccionado =
-                    backendMetodos?.find(
-                      (m) => String(m.id) === paymentMethod
-                    );
+                  const metodoSeleccionado = backendMetodos?.find(
+                    (m) => String(m.id) === paymentMethod
+                  );
 
+                  // 1. Registrar la venta en la base de datos (transacción atómica)
+                  // Solo incluye los items activos (no los que están en espera)
+                  await ventasService.confirmar({
+                    id_usuario:    usuario.id,
+                    id_metodo_pago: Number(paymentMethod),
+                    total,
+                    items: activeItems.map((item) => ({
+                      id_carrito:  Number(item.id),
+                      id_producto: item.id_producto,
+                      precio:      item.precio,
+                    })),
+                  });
+
+                  // 2. Notificar al admin por Discord
                   await pagosService.reportar({
-                    id_usuario: usuario.id,
-                    metodo_pago:
-                      metodoSeleccionado?.nombre ?? "Desconocido",
+                    id_usuario:  usuario.id,
+                    metodo_pago: metodoSeleccionado?.nombre ?? "Desconocido",
                     total,
                   });
 
                   setShowQrModal(false);
-
-                  alert(
-                    "Pago reportado correctamente. Será validado por un administrador."
-                  );
-
+                  alert("Pago reportado correctamente. Será validado por un administrador.");
                   navigate("/");
                 } catch (err) {
                   console.error(err);
-
-                  alert(
-                    "No se pudo reportar el pago. Inténtalo nuevamente."
-                  );
+                  alert("No se pudo confirmar el pago. Inténtalo nuevamente.");
                 }
               }}
             >
