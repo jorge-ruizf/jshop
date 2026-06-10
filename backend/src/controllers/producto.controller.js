@@ -49,16 +49,24 @@ export async function getProducto(req, res, next) {
 
 export async function createProducto(req, res, next) {
   try {
-    const { nombre, descripcion, id_vendedor, id_pais, id_categoria, id_videojuego } = req.body;
+    const { nombre, descripcion, id_vendedor, id_pais, id_categoria, id_videojuego, cantidad } = req.body;
     res.status(201).json(await prisma.producto.create({
-      data: { nombre, descripcion, id_vendedor, id_pais, id_categoria, id_videojuego },
+      data: {
+        nombre,
+        descripcion,
+        id_vendedor,
+        id_pais,
+        id_categoria,
+        id_videojuego,
+        cantidad: cantidad !== undefined ? Number(cantidad) : 0,
+      },
     }));
   } catch (err) { next(err); }
 }
 
 export async function updateProducto(req, res, next) {
   try {
-    const { nombre, descripcion, id_vendedor, id_pais, id_categoria, id_videojuego } = req.body;
+    const { nombre, descripcion, id_vendedor, id_pais, id_categoria, id_videojuego, cantidad } = req.body;
     res.json(await prisma.producto.update({
       where: { id: req.id },
       data: {
@@ -68,6 +76,7 @@ export async function updateProducto(req, res, next) {
         ...(id_pais       !== undefined && { id_pais }),
         ...(id_categoria  !== undefined && { id_categoria }),
         ...(id_videojuego !== undefined && { id_videojuego }),
+        ...(cantidad      !== undefined && { cantidad: Number(cantidad) }),
       },
     }));
   } catch (err) { next(err); }
