@@ -192,6 +192,9 @@ export function Store() {
   const filteredProductos = productos ?? [];
   const clearSellerFilter = () => setSelectedSellerId(null);
 
+  const getStock = (producto: Partial<Producto> | null | undefined): number =>
+    producto?.cantidad ?? 0;
+
   const handleAgregar = async (id_producto: number) => {
     if (!usuario) return;
     setAgregando(id_producto);
@@ -264,7 +267,9 @@ export function Store() {
               const alertaExistente = alertasMap.get(producto.id);
               const tieneAlerta = !!alertaExistente;
               const precioNum = getPrecioNum(producto);
-              const noDisponible = precioNum === null;
+              const stock = getStock(producto);
+              const agotado = stock === 0;
+              const noDisponible = precioNum === null || agotado;
 
               return (
                 <Card
@@ -283,28 +288,29 @@ export function Store() {
                         }`}
                     />
                     {noDisponible && (
-                      <span className="absolute bottom-2 left-2 bg-destructive text-destructive-foreground text-[10px] font-medium px-2 py-0.5 rounded-full">
-                        No disponible
-                      </span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <span className="bg-destructive text-destructive-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                          {(stock ?? 0) === 0 ? "Agotado" : "No disponible"}
+                        </span>
+                      </div>
                     )}
                     <Badge className="absolute top-2 right-2 bg-accent">Producto</Badge>
                   </div>
-
                   <div className="p-4">
                     <h3 className="mb-1 line-clamp-1">{producto.nombre}</h3>
 
                     <p className="text-sm text-muted-foreground mt-2 mb-3 line-clamp-2">
                       {producto.descripcion}
                     </p>
-
+                    <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                      <span>Cantidad: {stock ?? 0}</span>
+                    </div>
                     <div className="flex items-center gap-1.5 mb-3">
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Package className="w-3.5 h-3.5" />
-                        {producto.imagenes?.length
-                          ? `${producto.imagenes.length} ${producto.imagenes.length === 1 ? "imagen" : "imágenes"}`
-                          : "Sin imágenes"}
-                        {"  ·  "}
-                        {noDisponible ? "Sin stock" : "Disponible"}
+                        {stock === 0
+                          ? "Sin stock"
+                          : `${stock} en stock`}
                       </span>
                     </div>
 

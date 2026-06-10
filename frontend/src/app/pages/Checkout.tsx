@@ -564,24 +564,26 @@ export function Checkout() {
                   // 1. Registrar la venta en la base de datos (transacción atómica)
                   // Solo incluye los items activos (no los que están en espera)
                   await ventasService.confirmar({
-                    id_usuario:    usuario.id,
+                    id_usuario: usuario.id,
                     id_metodo_pago: Number(paymentMethod),
                     total,
                     items: activeItems.map((item) => ({
-                      id_carrito:  Number(item.id),
+                      id_carrito: Number(item.id),
                       id_producto: item.id_producto,
-                      precio:      item.precio,
+                      precio: item.precio,
                     })),
                   });
 
                   // 2. Notificar al admin por Discord
                   await pagosService.reportar({
-                    id_usuario:  usuario.id,
+                    id_usuario: usuario.id,
                     metodo_pago: metodoSeleccionado?.nombre ?? "Desconocido",
                     total,
                   });
 
                   setShowQrModal(false);
+                  setCartItems([]);       // ← limpiar estado local
+                  setOnHoldItems([]);     // ← limpiar items en espera también
                   alert("Pago reportado correctamente. Será validado por un administrador.");
                   navigate("/");
                 } catch (err) {

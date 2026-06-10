@@ -9,7 +9,7 @@ import { productosService } from "../services";
 import { carritoService } from "../services/carrito.service";
 import { useAuthContext } from "../contexts/AuthContext";
 import { productosDeseadosService } from "../services/productosDeseados.service";
-import type { ProductoDeseado } from "../services/types";
+import type { Producto, ProductoDeseado } from "../services/types";
 import { PriceAlertModal } from "../components/PriceAlertModal";
 import { formatPrecio } from "../utils/formatPrecio";
 
@@ -85,9 +85,8 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
         <div className="flex items-center justify-center gap-2 mt-4">
           {images.map((_, i) => (
             <button key={i} type="button" onClick={() => setCurrent(i)}
-              className={`rounded-full transition-all duration-200 ${
-                i === current ? "w-6 h-2.5 bg-primary" : "w-2.5 h-2.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
-              }`} />
+              className={`rounded-full transition-all duration-200 ${i === current ? "w-6 h-2.5 bg-primary" : "w-2.5 h-2.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
+                }`} />
           ))}
         </div>
       )}
@@ -97,9 +96,8 @@ function ImageCarousel({ images, title }: { images: string[]; title: string }) {
         <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
           {images.map((src, i) => (
             <button key={i} type="button" onClick={() => setCurrent(i)}
-              className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
-                i === current ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
-              }`}>
+              className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${i === current ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
+                }`}>
               <img src={src} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover"
                 onError={(e) => { (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=160&h=112&fit=crop"; }} />
             </button>
@@ -124,13 +122,16 @@ export function ProductDetail() {
     [id]
   );
 
+  const getStock = (producto: Partial<Producto> | null | undefined): number =>
+    producto?.cantidad ?? 0;
+
   // Cargar alerta existente si el usuario está logueado
   useEffect(() => {
     if (!usuario?.id || !id) return;
     productosDeseadosService.listar(usuario.id).then((alertas) => {
       const alerta = alertas.find((a) => a.id_producto === Number(id));
       setAlertaExistente(alerta);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [usuario?.id, id]);
 
   if (loading) return (
@@ -155,7 +156,9 @@ export function ProductDetail() {
     ? producto.precios?.find((p) => p.id_pais === usuario.id_pais)
     : null;
   const precioNum = precioMatch && Number(precioMatch.precio) > 0 ? Number(precioMatch.precio) : null;
-  const noDisponible = precioNum === null;
+  const stock = getStock(producto);
+  const agotado = stock === 0;
+  const noDisponible = precioNum === null || agotado;
 
   const images = producto.imagenes?.length
     ? producto.imagenes.map((img) => img.ruta)
@@ -208,6 +211,10 @@ export function ProductDetail() {
                 <Badge variant="outline" className="text-destructive border-destructive/40">
                   No disponible en tu región
                 </Badge>
+              )}{agotado && (
+                <Badge variant="destructive">
+                  Agotado
+                </Badge>
               )}
             </div>
 
@@ -257,7 +264,7 @@ export function ProductDetail() {
                 disabled={noDisponible || agregando}
                 className="flex-1 bg-secondary hover:bg-secondary/90 disabled:opacity-60">
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                {agregando ? "Añadiendo..." : noDisponible ? "No disponible" : "Añadir al carrito"}
+                {agregando ? "Añadiendo..." : agotado ? "Agotado" : noDisponible ? "No disponible" : "Añadir al carrito"}
               </Button>
 
               {usuario && (
@@ -265,13 +272,13 @@ export function ProductDetail() {
                   className={`flex-shrink-0 ${alertaExistente
                     ? "border-primary text-primary bg-primary/10 hover:bg-primary/20"
                     : "hover:border-primary/60"
-                  }`}>
+                    }`}>
                   {/* Bell inline para no crear otro componente */}
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
                     fill={alertaExistente ? "currentColor" : "none"} stroke="currentColor"
                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
-                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
                   </svg>
                 </Button>
               )}

@@ -28,6 +28,7 @@ export interface Producto {
   id: number;
   nombre: string;
   descripcion: string;
+  cantidad: number;
   id_vendedor: number;
   id_categoria: number;
   id_pais: number;
