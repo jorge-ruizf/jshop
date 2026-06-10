@@ -148,6 +148,8 @@ function ProductsSection() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploadingImagen, setUploadingImagen] = useState(false);
+  const [cantidad, setCantidad] = useState<string>("0");
+  const [editCantidad, setEditCantidad] = useState<string>("0");
 
   const resetForm = () => {
     setTitle("");
@@ -159,6 +161,7 @@ function ProductsSection() {
     setImageFile(null);
     setImagePreview("");
     setPrices({});
+    setCantidad("0");
   };
 
   const handleAdd = (e: React.FormEvent) => {
@@ -171,7 +174,9 @@ function ProductsSection() {
         id_pais: Number(paisId),
         id_videojuego: Number(videojuegoId),
         id_vendedor: Number(vendedorId) || 0,
-      });
+        cantidad: Number(cantidad) || 0,
+      } as Omit<Producto, "id" | "imagenes" | "precios">);
+
 
       const preciosPayload = Object.entries(prices)
         .filter(([, valor]) => valor !== '' && Number(valor) >= 0)
@@ -207,6 +212,7 @@ function ProductsSection() {
     setEditPaisId(String(p.id_pais));
     setEditVideojuegoId(String(p.id_videojuego ?? ""));
     setEditVendedorId(String(p.id_vendedor ?? ""));
+    setEditCantidad(String(p.cantidad ?? 0));
     // Precios existentes → Record<id_pais, precio>
     const preciosMap: Record<string, string> = {};
     (p.precios ?? []).forEach((pr: any) => {
@@ -230,7 +236,9 @@ function ProductsSection() {
         id_pais: Number(editPaisId),
         id_videojuego: Number(editVideojuegoId),
         id_vendedor: Number(editVendedorId) || 0,
-      });
+        cantidad: Number(editCantidad) || 0,
+      } as Omit<Producto, "id" | "imagenes" | "precios">);
+
 
       // 2. Actualizar precios
       const preciosPayload = Object.entries(editPrices)
@@ -332,26 +340,18 @@ function ProductsSection() {
             </select>
           </div>
 
-          {/* Stock field — backend doesn't have stock yet */}
+          {/* Stock */}
           <div className="space-y-2">
             <Label>Stock *</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min="0"
-                placeholder="Cantidad"
-                className="flex-1"
-
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled
-              >
-                <Infinity className="w-4 h-4 mr-1" />
-                Ilimitado
-              </Button>
-            </div>
+            <Input
+              type="number"
+              min="0"
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              placeholder="Cantidad disponible"
+              required
+              disabled={mutating}
+            />
           </div>
 
           <div className="space-y-2">
@@ -557,7 +557,7 @@ function ProductsSection() {
                 {editingId === p.id && (
                   <div className="border-t border-border px-4 pb-4 pt-3 space-y-4 bg-background">
 
-                    {/* Nombre y descripción */}
+                    {/* Nombre, descripción y stock */}
                     <div className="grid grid-cols-1 gap-3">
                       <div className="space-y-1">
                         <Label className="text-sm">Nombre</Label>
@@ -566,6 +566,17 @@ function ProductsSection() {
                       <div className="space-y-1">
                         <Label className="text-sm">Descripción</Label>
                         <Textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={2} disabled={mutating} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-sm">Stock (unidades disponibles)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editCantidad}
+                          onChange={(e) => setEditCantidad(e.target.value)}
+                          disabled={mutating}
+                          className="h-9"
+                        />
                       </div>
                     </div>
 
